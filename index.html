@@ -631,6 +631,148 @@
   .toast.success { border-color: var(--add); }
   .toast.error { border-color: var(--del); }
 
+  /* FULLSCREEN MODAL */
+  .fullscreen-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(6px);
+    animation: fadeInOverlay 0.2s ease;
+  }
+  .fullscreen-overlay.active { display: flex; flex-direction: column; }
+  @keyframes fadeInOverlay {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .fullscreen-panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin: 20px;
+    flex: 1;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+    animation: slideUpPanel 0.25s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes slideUpPanel {
+    from { transform: translateY(30px) scale(0.97); opacity: 0; }
+    to   { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  .fullscreen-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+    flex-shrink: 0;
+  }
+  .fullscreen-title {
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+  }
+  .fullscreen-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .btn-zoom {
+    padding: 5px 10px;
+    font-size: 12px;
+    font-family: var(--mono);
+    font-weight: 700;
+    border: 1px solid var(--border);
+    background: var(--surface3);
+    color: var(--text2);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    min-width: 34px;
+    text-align: center;
+  }
+  .btn-zoom:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .zoom-level-display {
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--accent);
+    background: rgba(79,142,247,0.1);
+    border: 1px solid rgba(79,142,247,0.2);
+    border-radius: 20px;
+    padding: 3px 12px;
+    min-width: 52px;
+    text-align: center;
+  }
+  .btn-close-fs {
+    padding: 6px 14px;
+    font-size: 13px;
+    font-family: var(--sans);
+    font-weight: 700;
+    border: 1px solid var(--del);
+    background: rgba(255,92,108,0.1);
+    color: var(--del);
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 5px;
+    margin-left: 8px;
+  }
+  .btn-close-fs:hover { background: var(--del); color: #fff; }
+  .fullscreen-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+  .fullscreen-diff-container {
+    flex: 1;
+    overflow: auto;
+    font-family: var(--mono);
+    line-height: 1.65;
+    transition: font-size 0.15s;
+  }
+  /* ── FIX: cloned .diff-container inside fullscreen must not be constrained ── */
+  .fullscreen-diff-container .diff-container {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+  .fullscreen-legend {
+    display: flex;
+    gap: 20px;
+    padding: 10px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    font-size: 12px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+  /* Fullscreen expand button in results header */
+  .btn-expand-fs {
+    padding: 7px 14px;
+    font-size: 12px;
+    font-family: var(--sans);
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--surface3);
+    color: var(--text2);
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .btn-expand-fs:hover { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 4px 14px rgba(79,142,247,0.25); }
+
   @media (max-width: 900px) {
     main { padding: 16px; }
     header { padding: 12px 16px; }
@@ -816,6 +958,7 @@
         <span data-i18n="resultsTitle">Karşılaştırma Sonuçları</span>
       </div>
       <div class="results-actions">
+        <button class="btn-expand-fs" onclick="openFullscreen()" id="btnExpandFs" data-i18n="expandFs">⛶ Büyüt</button>
         <button class="btn-export" onclick="exportHTML()" data-i18n="exportHTML">⬇️ HTML Dışa Aktar</button>
         <button class="btn-export" onclick="exportText()" data-i18n="exportText">📄 Metin Dışa Aktar</button>
         <button class="btn-export" onclick="copyResult()" data-i18n="copyResult">📋 Sonucu Kopyala</button>
@@ -853,6 +996,40 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- FULLSCREEN MODAL -->
+<div class="fullscreen-overlay" id="fullscreenOverlay">
+  <div class="fullscreen-panel">
+    <div class="fullscreen-header">
+      <div class="fullscreen-title">
+        <span>🔍</span>
+        <span data-i18n="resultsTitle">Karşılaştırma Sonuçları</span>
+      </div>
+      <div class="fullscreen-controls">
+        <button class="btn-zoom" onclick="fsZoom(-1)" title="Küçült">−</button>
+        <div class="zoom-level-display" id="fsZoomLabel">100%</div>
+        <button class="btn-zoom" onclick="fsZoom(+1)" title="Büyüt">+</button>
+        <button class="btn-zoom" onclick="fsZoomReset()" title="Sıfırla" style="min-width:52px;">⟳ Sıfırla</button>
+        <button class="btn-close-fs" onclick="closeFullscreen()">✕ Kapat</button>
+      </div>
+    </div>
+    <!-- Change Navigator (mirrored) -->
+    <div class="fullscreen-nav" id="fsChangeNav" style="display:none">
+      <button class="btn-nav" id="fsBtnPrev" onclick="prevChange(); fsSyncNav()" disabled data-i18n="navPrev">↑ Önceki</button>
+      <button class="btn-nav" id="fsBtnNext" onclick="nextChange(); fsSyncNav()" disabled data-i18n="navNext">↓ Sonraki</button>
+      <div class="change-nav-counter" id="fsNavCounter">— / —</div>
+      <div class="change-nav-label" data-i18n="navChange">değişiklik</div>
+      <div class="change-nav-types" id="fsNavTypes"></div>
+      <div class="change-nav-hint">F7 · Shift+F7 · Esc</div>
+    </div>
+    <div class="fullscreen-diff-container" id="fsDiffContainer"></div>
+    <div class="fullscreen-legend" id="fsLegend" style="display:none">
+      <div class="legend-item"><div class="legend-dot add"></div> <span data-i18n="legendAdded">Eklendi</span></div>
+      <div class="legend-item"><div class="legend-dot del"></div> <span data-i18n="legendDeleted">Silindi</span></div>
+      <div class="legend-item"><div class="legend-dot unchanged"></div> <span data-i18n="legendUnchanged">Değişmedi</span></div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ─── I18N ─────────────────────────────────────────────────────────────────────
 const translations = {
@@ -884,6 +1061,7 @@ const translations = {
     statModified: '✏️ Değiştirilen',
     statUnchanged: '✓ Değişmeyen',
     resultsTitle: 'Karşılaştırma Sonuçları',
+    expandFs: '⛶ Büyüt',
     exportHTML: '⬇️ HTML Dışa Aktar',
     exportText: '📄 Metin Dışa Aktar',
     copyResult: '📋 Sonucu Kopyala',
@@ -893,7 +1071,6 @@ const translations = {
     legendDeleted: 'Silindi',
     legendUnchanged: 'Değişmedi',
     footer: 'Tamamen tarayıcı tabanlı — hiçbir veri sunucuya gönderilmez',
-    // dynamic toasts & messages
     toastNoFiles: 'Lütfen her iki dosyayı da yükleyin',
     toastNoFileA: 'A dosyasını yükleyin',
     toastNoFileB: 'B dosyasını yükleyin',
@@ -946,6 +1123,7 @@ const translations = {
     statModified: '✏️ Modified',
     statUnchanged: '✓ Unchanged',
     resultsTitle: 'Comparison Results',
+    expandFs: '⛶ Expand',
     exportHTML: '⬇️ Export HTML',
     exportText: '📄 Export Text',
     copyResult: '📋 Copy Result',
@@ -955,7 +1133,6 @@ const translations = {
     legendDeleted: 'Deleted',
     legendUnchanged: 'Unchanged',
     footer: 'Fully browser-based — no data is sent to a server',
-    // dynamic toasts & messages
     toastNoFiles: 'Please upload both files',
     toastNoFileA: 'Upload file A',
     toastNoFileB: 'Upload file B',
@@ -992,32 +1169,26 @@ function setLang(lang) {
 
   const t = translations[lang];
 
-  // header meta
   document.getElementById('header-meta').textContent = t.headerMeta;
 
-  // data-i18n elements
   document.querySelectorAll('[data-i18n]').forEach(el => {
     const key = el.getAttribute('data-i18n');
     if (t[key] !== undefined) el.textContent = t[key];
   });
 
-  // placeholders
   document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
     const key = el.getAttribute('data-i18n-placeholder');
     if (t[key] !== undefined) el.placeholder = t[key];
   });
 
-  // title attributes
   document.querySelectorAll('[data-i18n-title]').forEach(el => {
     const key = el.getAttribute('data-i18n-title');
     if (t[key] !== undefined) el.title = t[key];
   });
 
-  // update char counts with translated format
   updateCount('a');
   updateCount('b');
 
-  // re-render diff columns if result exists
   if (lastDiffResult) renderDiff(lastDiffResult);
 }
 
@@ -1121,14 +1292,12 @@ function formatSize(bytes) {
 function lcs(a, b) {
   const n = a.length, m = b.length;
   if (n === 0 || m === 0) return [];
-  // For large files, use greedy approach
   if (n * m > 200000) return lcsGreedy(a, b);
   const dp = [];
   for (let i = 0; i <= n; i++) { dp[i] = new Array(m+1).fill(0); }
   for (let i = 1; i <= n; i++)
     for (let j = 1; j <= m; j++)
       dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
-  // backtrack
   const seq = [];
   let i = n, j = m;
   while (i > 0 && j > 0) {
@@ -1140,7 +1309,6 @@ function lcs(a, b) {
 }
 
 function lcsGreedy(a, b) {
-  // Patience-like approximation for large inputs
   const result = [];
   const bMap = new Map();
   b.forEach((v,i) => { if (!bMap.has(v)) bMap.set(v,[]); bMap.get(v).push(i); });
@@ -1179,18 +1347,16 @@ function computeDiff(textA, textB) {
   const commonA = new Set(common.map(p=>p[0]));
   const commonB = new Set(common.map(p=>p[1]));
 
-  const ops = []; // {type, lineA, lineB, textA, textB}
+  const ops = [];
   let ci = 0, ai = 0, bi = 0;
 
   while (ai < linesA.length || bi < linesB.length) {
     if (ci < common.length) {
       const [ca, cb] = common[ci];
-      // drain deletions
       while (ai < ca) {
         ops.push({type:'del', lineA:ai+1, textA:linesA[ai]});
         ai++;
       }
-      // drain insertions
       while (bi < cb) {
         ops.push({type:'add', lineB:bi+1, textB:linesB[bi]});
         bi++;
@@ -1209,7 +1375,6 @@ function computeDiff(textA, textB) {
     }
   }
 
-  // Pair del+add as modify
   const result = [];
   for (let i = 0; i < ops.length; i++) {
     if (ops[i].type === 'del' && i+1 < ops.length && ops[i+1].type === 'add') {
@@ -1317,7 +1482,6 @@ function computeVisibleSet(diff) {
       }
     }
   });
-  // If nothing changed, show everything
   if (visible.size === 0) diff.forEach((_, i) => visible.add(i));
   return visible;
 }
@@ -1325,7 +1489,6 @@ function computeVisibleSet(diff) {
 function renderSplit(diff, container, showNums, wordDiffOn) {
   const visible = computeVisibleSet(diff);
 
-  // Build groups: [{type:'visible', ops:[...]}, {type:'collapsed', ops:[...]}]
   const groups = [];
   let i = 0;
   while (i < diff.length) {
@@ -1362,7 +1525,6 @@ function renderSplit(diff, container, showNums, wordDiffOn) {
       const cid = 'collapse-' + (collapseId++);
       const label = translations[currentLang].collapseLabel(count);
 
-      // Single separator row spanning both columns — left side drives the expand icon
       const sepCellLeft = `<div class="diff-line collapse-sep" data-collapse-id="${cid}" data-side="left" onclick="expandCollapse('${cid}')">
         <span class="collapse-sep-label"><span class="expand-icon">⊕</span>${rangeA ? `<span style="color:var(--text3);font-size:11px">${rangeA}</span>` : ''}${label}</span>
       </div>`;
@@ -1372,7 +1534,6 @@ function renderSplit(diff, container, showNums, wordDiffOn) {
 
       rowsHTML += `<div class="diff-split-row collapse-sep-row"><div class="diff-split-cell">${sepCellLeft}</div><div class="diff-split-cell">${sepCellRight}</div></div>`;
 
-      // Hidden content rows — paired per line
       let hiddenPairs = '';
       group.ops.forEach(({ op }) => {
         const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
@@ -1431,7 +1592,6 @@ function renderUnified(diff, container, showNums, wordDiffOn) {
     }
   }
 
-  const isTr = currentLang === 'tr';
   let html = '';
   let collapseId = 0;
 
@@ -1485,7 +1645,6 @@ function expandCollapse(cid) {
   const seps    = document.querySelectorAll(`[data-collapse-id="${cid}"]`);
   if (!wrapper) return;
 
-  // Since wrapper uses display:contents, toggle each child row individually
   const childRows = wrapper.querySelectorAll('.diff-split-row');
   const isHidden  = childRows.length > 0 && childRows[0].style.display === 'none';
 
@@ -1520,7 +1679,6 @@ function buildChangeNav() {
   const seen = new Set();
   changeElements = [];
 
-  // Collect one representative element per change index (first in DOM order)
   document.querySelectorAll('#diffContainer [data-change-idx]').forEach(el => {
     const key = el.getAttribute('data-change-idx');
     if (!seen.has(key)) {
@@ -1540,7 +1698,6 @@ function buildChangeNav() {
   nav.style.display = 'flex';
   updateChangeNavUI();
 
-  // Build type summary
   const counts = { add: 0, del: 0, mod: 0 };
   changeElements.forEach(el => {
     const t = el.getAttribute('data-change-type');
@@ -1579,7 +1736,6 @@ function scrollToChange() {
   const el = changeElements[currentChangeIdx];
   if (!el) return;
 
-  // Scroll the diff-container so the target line is visible
   const diffContainer = document.getElementById('diffContainer');
   const containerRect = diffContainer.getBoundingClientRect();
   const elRect = el.getBoundingClientRect();
@@ -1587,7 +1743,6 @@ function scrollToChange() {
   const targetScroll = relTop - diffContainer.clientHeight / 2 + elRect.height / 2;
   diffContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
 
-  // Also handle sibling elements with same data-change-idx (split view both sides)
   const idx = el.getAttribute('data-change-idx');
   document.querySelectorAll(`#diffContainer [data-change-idx="${idx}"]`).forEach(sibling => {
     sibling.classList.remove('change-highlight');
@@ -1661,11 +1816,147 @@ function showToast(msg, type='') {
   toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
 }
 
+// ─── FULLSCREEN / ZOOM ────────────────────────────────────────────────────────
+let fsZoomLevel = 13;
+const FS_ZOOM_STEP = 1;
+const FS_ZOOM_MIN  = 9;
+const FS_ZOOM_MAX  = 22;
+
+function openFullscreen() {
+  if (!lastDiffResult) return showToast(translations[currentLang].toastCompareFirst, 'error');
+
+  const overlay      = document.getElementById('fullscreenOverlay');
+  const fsContainer  = document.getElementById('fsDiffContainer');
+  const srcContainer = document.getElementById('diffContainer');
+
+  // Deep-clone the diff DOM
+  const clone = srcContainer.cloneNode(true);
+
+  // ── BUG FIX: remove the 600px max-height & overflow constraints from the clone ──
+  // The original .diff-container has max-height:600px / overflow:auto for the
+  // inline panel. Inside fullscreen, fsDiffContainer handles scrolling instead.
+  clone.style.maxHeight = 'none';
+  clone.style.overflow  = 'visible';
+
+  // Prefix all id attributes inside the clone so they don't clash with originals
+  clone.querySelectorAll('[id]').forEach(el => {
+    el.id = 'fs__' + el.id;
+  });
+
+  // Fix data-collapse-id references on separator elements
+  clone.querySelectorAll('[data-collapse-id]').forEach(el => {
+    el.setAttribute('data-collapse-id', 'fs__' + el.getAttribute('data-collapse-id'));
+  });
+
+  // Strip all onclick attributes — we'll use event delegation below
+  clone.querySelectorAll('[onclick]').forEach(el => el.removeAttribute('onclick'));
+
+  fsContainer.innerHTML = '';
+  fsContainer.appendChild(clone);
+
+  // ── Event delegation for collapse separators inside fullscreen ──
+  fsContainer.addEventListener('click', fsSepClickHandler);
+
+  fsZoomLevel = 13;
+  fsContainer.style.fontSize = fsZoomLevel + 'px';
+  document.getElementById('fsZoomLabel').textContent = '100%';
+
+  fsSyncNav();
+
+  const legendVisible = document.getElementById('legendBar').style.display !== 'none';
+  document.getElementById('fsLegend').style.display = legendVisible ? '' : 'none';
+
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function fsSepClickHandler(e) {
+  const sep = e.target.closest('.collapse-sep');
+  if (!sep) return;
+
+  const cid = sep.getAttribute('data-collapse-id');
+  if (!cid) return;
+
+  // Split view collapse (rows wrapper)
+  const wrapper = document.getElementById(cid + '-rows');
+  if (wrapper) {
+    const childRows = wrapper.querySelectorAll('.diff-split-row');
+    const isHidden  = childRows.length > 0 && childRows[0].style.display === 'none';
+    childRows.forEach(row => { row.style.display = isHidden ? '' : 'none'; });
+    document.querySelectorAll(`[data-collapse-id="${cid}"]`).forEach(s => {
+      const icon = s.querySelector('.expand-icon');
+      if (icon) icon.textContent = isHidden ? '⊖' : '⊕';
+    });
+    return;
+  }
+
+  // Unified view collapse
+  const rows = document.getElementById(cid);
+  if (rows) {
+    const prevSep = rows.previousElementSibling;
+    const isHidden = rows.style.display === 'none';
+    rows.style.display = isHidden ? '' : 'none';
+    if (prevSep) {
+      prevSep.style.display = isHidden ? 'none' : '';
+      const icon = prevSep.querySelector('.expand-icon');
+      if (icon) icon.textContent = isHidden ? '⊖' : '⊕';
+    }
+  }
+}
+
+function closeFullscreen() {
+  const fsContainer = document.getElementById('fsDiffContainer');
+  fsContainer.removeEventListener('click', fsSepClickHandler);
+  document.getElementById('fullscreenOverlay').classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+function fsZoom(dir) {
+  fsZoomLevel = Math.min(FS_ZOOM_MAX, Math.max(FS_ZOOM_MIN, fsZoomLevel + dir * FS_ZOOM_STEP));
+  const pct = Math.round((fsZoomLevel / 13) * 100);
+  document.getElementById('fsDiffContainer').style.fontSize = fsZoomLevel + 'px';
+  document.getElementById('fsZoomLabel').textContent = pct + '%';
+}
+
+function fsZoomReset() {
+  fsZoomLevel = 13;
+  document.getElementById('fsDiffContainer').style.fontSize = '13px';
+  document.getElementById('fsZoomLabel').textContent = '100%';
+}
+
+function fsSyncNav() {
+  const mainNav = document.getElementById('changeNav');
+  const fsNav   = document.getElementById('fsChangeNav');
+  const isVisible = mainNav.style.display !== 'none';
+  fsNav.style.display = isVisible ? 'flex' : 'none';
+
+  if (isVisible) {
+    document.getElementById('fsNavCounter').textContent = document.getElementById('changeNavCounter').textContent;
+    document.getElementById('fsNavTypes').innerHTML    = document.getElementById('changeNavTypes').innerHTML;
+    const prevDisabled = document.getElementById('btnPrevChange').disabled;
+    const nextDisabled = document.getElementById('btnNextChange').disabled;
+    document.getElementById('fsBtnPrev').disabled = prevDisabled;
+    document.getElementById('fsBtnNext').disabled = nextDisabled;
+  }
+}
+
 // ─── KEYBOARD SHORTCUT ────────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); runDiff(); }
-  if (e.key === 'F7') { e.preventDefault(); e.shiftKey ? prevChange() : nextChange(); }
+  if (e.key === 'F7') { e.preventDefault(); e.shiftKey ? prevChange() : nextChange(); fsSyncNav(); }
+  if (e.key === 'Escape') { closeFullscreen(); }
 });
+
+document.getElementById('fullscreenOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('fullscreenOverlay')) closeFullscreen();
+});
+
+document.getElementById('fullscreenOverlay').addEventListener('wheel', e => {
+  if (e.ctrlKey) {
+    e.preventDefault();
+    fsZoom(e.deltaY < 0 ? 1 : -1);
+  }
+}, { passive: false });
 </script>
 </body>
 </html>
