@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DiffTool — Dosya & Metin Karşılaştırıcı</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #13161e;
+    --surface2: #1a1e28;
+    --surface3: #222736;
+    --border: #2a2f3d;
+    --accent: #4f8ef7;
+    --accent2: #6ee7b7;
+    --del: #ff5c6c;
+    --del-bg: #2a1218;
+    --del-bg2: #3d1a1a;
+    --add: #4ade80;
+    --add-bg: #0f2a1a;
+    --add-bg2: #1a3d28;
+    --mod: #fbbf24;
+    --mod-bg: #2a2010;
+    --text: #e2e8f0;
+    --text2: #94a3b8;
+    --text3: #64748b;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+    --radius: 10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+  .logo span { color: var(--accent); }
+  .header-meta { font-size: 12px; color: var(--text3); font-family: var(--mono); }
+
+  /* MAIN LAYOUT */
+  main { flex: 1; display: flex; flex-direction: column; padding: 24px 32px; gap: 16px; max-width: 1600px; width: 100%; margin: 0 auto; }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    padding: 4px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    width: fit-content;
+  }
+  .tab {
+    padding: 8px 18px;
+    border: none;
+    background: transparent;
+    color: var(--text2);
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 7px;
+    transition: all 0.2s;
+  }
+  .tab.active { background: var(--surface3); color: var(--text); }
+  .tab:hover:not(.active) { color: var(--text); background: var(--surface2); }
+
+  /* INPUT PANELS */
+  .input-section { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .panel-label {
+    font-size: 13px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge {
+    font-size: 11px;
+    font-family: var(--mono);
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+  .badge-a { background: rgba(79,142,247,0.15); color: var(--accent); }
+  .badge-b { background: rgba(110,231,183,0.15); color: var(--accent2); }
+
+  .panel-actions { display: flex; gap: 6px; }
+  .btn-small {
+    padding: 5px 10px;
+    font-size: 12px;
+    font-family: var(--sans);
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--surface3);
+    color: var(--text2);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .btn-small:hover { background: var(--surface2); color: var(--text); border-color: var(--accent); }
+
+  textarea {
+    flex: 1;
+    min-height: 220px;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 14px 16px;
+    resize: vertical;
+    outline: none;
+    line-height: 1.6;
+  }
+  textarea::placeholder { color: var(--text3); }
+  textarea:focus { background: rgba(79,142,247,0.03); }
+
+  .char-count { padding: 6px 16px; font-size: 11px; color: var(--text3); font-family: var(--mono); border-top: 1px solid var(--border); background: var(--surface2); }
+
+  /* FILE DROP ZONE */
+  .drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    margin: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(79,142,247,0.05);
+  }
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .drop-icon { font-size: 32px; margin-bottom: 10px; }
+  .drop-text { font-size: 14px; font-weight: 600; color: var(--text2); }
+  .drop-hint { font-size: 12px; color: var(--text3); margin-top: 4px; font-family: var(--mono); }
+  .file-info {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    background: var(--surface3); border-radius: 8px; margin: 12px;
+    font-size: 13px; font-family: var(--mono);
+  }
+  .file-info-icon { font-size: 20px; }
+  .file-info-name { font-weight: 500; color: var(--accent); }
+  .file-info-size { color: var(--text3); font-size: 11px; }
+  .file-clear {
+    margin-left: auto; cursor: pointer; color: var(--text3);
+    background: none; border: none; font-size: 16px; line-height: 1;
+  }
+  .file-clear:hover { color: var(--del); }
+
+  /* ACTION BAR */
+  .action-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .btn-compare {
+    padding: 10px 28px;
+    background: linear-gradient(135deg, var(--accent), #7c3aed);
+    border: none;
+    color: #fff;
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 700;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 8px;
+    letter-spacing: 0.3px;
+  }
+  .btn-compare:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(79,142,247,0.3); }
+  .btn-compare:active { transform: translateY(0); }
+
+  .separator { width: 1px; height: 24px; background: var(--border); }
+
+  .option-group { display: flex; align-items: center; gap: 8px; }
+  .option-label { font-size: 13px; color: var(--text2); font-weight: 600; }
+  .toggle {
+    display: flex;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .toggle-btn {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-family: var(--sans);
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    color: var(--text3);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .toggle-btn.active { background: var(--surface3); color: var(--text); }
+
+  .checkbox-label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text2); cursor: pointer; font-weight: 600; }
+  .checkbox-label input { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+
+  /* STATS */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .stat-num { font-size: 26px; font-weight: 800; font-family: var(--mono); }
+  .stat-label { font-size: 12px; color: var(--text3); font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+  .stat-added .stat-num { color: var(--add); }
+  .stat-deleted .stat-num { color: var(--del); }
+  .stat-modified .stat-num { color: var(--mod); }
+  .stat-unchanged .stat-num { color: var(--text3); }
+
+  /* RESULTS */
+  .results-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .results-title { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+
+  .results-actions { display: flex; gap: 8px; }
+  .btn-export {
+    padding: 7px 14px;
+    font-size: 12px;
+    font-family: var(--sans);
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: var(--surface3);
+    color: var(--text2);
+    border-radius: 7px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .btn-export:hover { background: var(--surface2); color: var(--text); border-color: var(--accent2); }
+
+  /* DIFF VIEW */
+  .diff-container {
+    overflow: auto;
+    max-height: 600px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.65;
+  }
+
+  /* Split view */
+  .diff-split { display: grid; grid-template-columns: 1fr 1fr; }
+  .diff-col { border-right: 1px solid var(--border); }
+  .diff-col:last-child { border-right: none; }
+  .diff-col-header {
+    padding: 8px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text3);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  .diff-line {
+    display: flex;
+    align-items: stretch;
+    min-height: 22px;
+    transition: background 0.1s;
+  }
+  .diff-line:hover { filter: brightness(1.15); }
+  .diff-line.added { background: var(--add-bg); }
+  .diff-line.deleted { background: var(--del-bg); }
+  .diff-line.modified-a { background: var(--del-bg); }
+  .diff-line.modified-b { background: var(--add-bg); }
+  .diff-line.context { background: transparent; }
+  .diff-line.separator { background: var(--surface2); }
+  .diff-line.collapse-sep {
+    background: var(--surface2);
+    cursor: pointer;
+    user-select: none;
+    justify-content: center;
+    gap: 10px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+  .diff-line.collapse-sep:hover { background: var(--surface3); }
+  .collapse-sep-label {
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+  }
+  .collapse-sep-label .expand-icon { font-size: 14px; color: var(--accent); transition: transform 0.2s; }
+  .collapse-sep-label:hover .expand-icon { transform: scale(1.2); }
+  .collapse-sep-count {
+    background: rgba(79,142,247,0.12);
+    color: var(--accent);
+    border-radius: 12px;
+    padding: 1px 10px;
+    font-weight: 700;
+    font-size: 11px;
+    border: 1px solid rgba(79,142,247,0.2);
+  }
+
+  .line-num {
+    min-width: 44px;
+    padding: 1px 12px 1px 8px;
+    text-align: right;
+    color: var(--text3);
+    font-size: 11px;
+    user-select: none;
+    border-right: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: flex-end;
+    flex-shrink: 0;
+  }
+  .diff-line.added .line-num { background: var(--add-bg2); color: var(--add); }
+  .diff-line.deleted .line-num { background: var(--del-bg2); color: var(--del); }
+  .diff-line.modified-a .line-num { background: var(--del-bg2); color: var(--del); }
+  .diff-line.modified-b .line-num { background: var(--add-bg2); color: var(--add); }
+
+  .line-sign {
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    padding-top: 1px;
+  }
+  .diff-line.added .line-sign { color: var(--add); }
+  .diff-line.deleted .line-sign { color: var(--del); }
+  .diff-line.modified-a .line-sign { color: var(--del); }
+  .diff-line.modified-b .line-sign { color: var(--add); }
+  .diff-line.separator .line-sign { color: var(--text3); }
+
+  .line-content {
+    flex: 1;
+    padding: 1px 14px;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .diff-line.separator .line-content { color: var(--text3); font-style: italic; font-size: 12px; }
+
+  /* inline word diff */
+  .word-del { background: rgba(255,92,108,0.35); border-radius: 2px; text-decoration: line-through; color: #ffa7b0; }
+  .word-add { background: rgba(74,222,128,0.3); border-radius: 2px; color: #86efac; }
+
+  /* Unified diff */
+  .diff-unified {}
+
+  /* Change Navigator */
+  .change-nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .change-nav-label {
+    font-size: 12px;
+    color: var(--text3);
+    font-family: var(--mono);
+    font-weight: 500;
+  }
+  .change-nav-counter {
+    font-size: 13px;
+    font-family: var(--mono);
+    font-weight: 700;
+    color: var(--accent);
+    min-width: 60px;
+    background: rgba(79,142,247,0.1);
+    border: 1px solid rgba(79,142,247,0.2);
+    border-radius: 20px;
+    padding: 2px 12px;
+    text-align: center;
+  }
+  .btn-nav {
+    padding: 5px 14px;
+    font-size: 12px;
+    font-family: var(--sans);
+    font-weight: 700;
+    border: 1px solid var(--border);
+    background: var(--surface3);
+    color: var(--text2);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 5px;
+    letter-spacing: 0.2px;
+  }
+  .btn-nav:hover:not(:disabled) { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 4px 12px rgba(79,142,247,0.25); }
+  .btn-nav:active:not(:disabled) { transform: translateY(1px); }
+  .btn-nav:disabled { opacity: 0.3; cursor: not-allowed; }
+  .change-nav-hint {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text3);
+    font-family: var(--mono);
+  }
+  .change-nav-types {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .nav-type-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+  }
+  .nav-type-dot.add { background: var(--add); }
+  .nav-type-dot.del { background: var(--del); }
+  .nav-type-dot.mod { background: var(--mod); }
+
+  @keyframes changeFlash {
+    0%   { filter: brightness(2.5) saturate(1.5); }
+    60%  { filter: brightness(1.6); }
+    100% { filter: brightness(1.15); }
+  }
+  .change-highlight { animation: changeFlash 0.55s ease forwards; }
+
+  /* Empty state */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text3);
+    gap: 12px;
+  }
+  .empty-state-icon { font-size: 48px; opacity: 0.4; }
+  .empty-state-text { font-size: 15px; font-weight: 600; color: var(--text2); }
+  .empty-state-hint { font-size: 13px; }
+
+  /* LEGEND */
+  .legend {
+    display: flex;
+    gap: 20px;
+    padding: 10px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--surface2);
+    font-size: 12px;
+    flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; color: var(--text2); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .legend-dot.add { background: var(--add); }
+  .legend-dot.del { background: var(--del); }
+  .legend-dot.unchanged { background: var(--text3); }
+
+  /* FOOTER */
+  footer {
+    text-align: center;
+    padding: 16px;
+    font-size: 12px;
+    color: var(--text3);
+    border-top: 1px solid var(--border);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface2); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+  /* Hidden */
+  .hidden { display: none !important; }
+
+  /* Lang Toggle */
+  .lang-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 6px;
+  }
+  .lang-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+    font-family: var(--mono);
+    font-weight: 700;
+    border: none;
+    background: transparent;
+    color: var(--text3);
+    cursor: pointer;
+    border-radius: 14px;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .lang-btn.active {
+    background: var(--accent);
+    color: #fff;
+  }
+  .lang-btn:hover:not(.active) { color: var(--text); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px 20px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 9999;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(.34,1.56,.64,1);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: var(--add); }
+  .toast.error { border-color: var(--del); }
+
+  @media (max-width: 900px) {
+    main { padding: 16px; }
+    header { padding: 12px 16px; }
+    .input-section { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .diff-split { grid-template-columns: 1fr; }
+    .diff-col:first-child { border-bottom: 1px solid var(--border); border-right: none; }
+    .action-bar { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    Diff<span>Tool</span>
+  </div>
+  <div style="display:flex; align-items:center; gap:16px;">
+    <div class="lang-toggle">
+      <button class="lang-btn active" id="lang-tr" onclick="setLang('tr')">TR</button>
+      <button class="lang-btn" id="lang-en" onclick="setLang('en')">EN</button>
+    </div>
+    <div class="header-meta" id="header-meta">v1.6 · Tamamen yerel · Sunucuya veri gönderilmez</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Input Tabs -->
+  <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('text')" data-i18n="tabText">✏️ Metin</button>
+      <button class="tab" onclick="switchTab('file')" data-i18n="tabFile">📂 Dosya</button>
+    </div>
+    <div style="font-size:12px; color:var(--text3); font-family:var(--mono);" data-i18n="fileTypes">
+      TXT, JS, PY, HTML, CSS, JSON, XML, MD, CSV ve daha fazlası desteklenir
+    </div>
+  </div>
+
+  <!-- TEXT INPUT SECTION -->
+  <div id="tab-text" class="input-section">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-label">
+          <span class="badge badge-a">A</span>
+          <span data-i18n="origText">Orijinal Metin</span>
+        </div>
+        <div class="panel-actions">
+          <button class="btn-small" onclick="copyText('a')" data-i18n="btnCopy">📋 Kopyala</button>
+          <button class="btn-small" onclick="clearText('a')" data-i18n="btnClear">🗑️ Temizle</button>
+        </div>
+      </div>
+      <textarea id="textA" data-i18n-placeholder="placeholderA" placeholder="Karşılaştırmak istediğiniz ilk metni buraya yapıştırın..." oninput="updateCount('a')"></textarea>
+      <div class="char-count" id="countA">0 satır · 0 karakter</div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-label">
+          <span class="badge badge-b">B</span>
+          <span data-i18n="modText">Değiştirilmiş Metin</span>
+        </div>
+        <div class="panel-actions">
+          <button class="btn-small" onclick="copyText('b')" data-i18n="btnCopy">📋 Kopyala</button>
+          <button class="btn-small" onclick="clearText('b')" data-i18n="btnClear">🗑️ Temizle</button>
+        </div>
+      </div>
+      <textarea id="textB" data-i18n-placeholder="placeholderB" placeholder="Karşılaştırmak istediğiniz ikinci metni buraya yapıştırın..." oninput="updateCount('b')"></textarea>
+      <div class="char-count" id="countB">0 satır · 0 karakter</div>
+    </div>
+  </div>
+
+  <!-- FILE INPUT SECTION -->
+  <div id="tab-file" class="input-section hidden">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-label">
+          <span class="badge badge-a">A</span>
+          <span data-i18n="origFile">Orijinal Dosya</span>
+        </div>
+        <div class="panel-actions">
+          <button class="btn-small" id="clearFileA" onclick="clearFile('a')" style="display:none" data-i18n="btnClear">🗑️ Temizle</button>
+        </div>
+      </div>
+      <div id="dropA" class="drop-zone" ondragover="onDragOver(event,'a')" ondragleave="onDragLeave(event,'a')" ondrop="onDrop(event,'a')">
+        <input type="file" id="fileInputA" onchange="onFileSelect(event,'a')" accept="*/*">
+        <div class="drop-icon">📄</div>
+        <div class="drop-text" data-i18n="dropText">Dosyayı sürükleyip bırakın</div>
+        <div class="drop-hint" data-i18n="dropHint">veya tıklayarak seçin</div>
+      </div>
+      <div id="fileInfoA" class="file-info hidden">
+        <span class="file-info-icon">📄</span>
+        <div>
+          <div class="file-info-name" id="fileNameA">—</div>
+          <div class="file-info-size" id="fileSizeA">—</div>
+        </div>
+        <button class="file-clear" onclick="clearFile('a')">✕</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-label">
+          <span class="badge badge-b">B</span>
+          <span data-i18n="modFile">Değiştirilmiş Dosya</span>
+        </div>
+        <div class="panel-actions">
+          <button class="btn-small" id="clearFileB" onclick="clearFile('b')" style="display:none" data-i18n="btnClear">🗑️ Temizle</button>
+        </div>
+      </div>
+      <div id="dropB" class="drop-zone" ondragover="onDragOver(event,'b')" ondragleave="onDragLeave(event,'b')" ondrop="onDrop(event,'b')">
+        <input type="file" id="fileInputB" onchange="onFileSelect(event,'b')" accept="*/*">
+        <div class="drop-icon">📄</div>
+        <div class="drop-text" data-i18n="dropText">Dosyayı sürükleyip bırakın</div>
+        <div class="drop-hint" data-i18n="dropHint">veya tıklayarak seçin</div>
+      </div>
+      <div id="fileInfoB" class="file-info hidden">
+        <span class="file-info-icon">📄</span>
+        <div>
+          <div class="file-info-name" id="fileNameB">—</div>
+          <div class="file-info-size" id="fileSizeB">—</div>
+        </div>
+        <button class="file-clear" onclick="clearFile('b')">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ACTION BAR -->
+  <div class="action-bar">
+    <button class="btn-compare" onclick="runDiff()" data-i18n="btnCompare">⚡ Karşılaştır</button>
+    <div class="separator"></div>
+    <div class="option-group">
+      <span class="option-label" data-i18n="view">Görünüm:</span>
+      <div class="toggle">
+        <button class="toggle-btn active" id="toggle-split" onclick="setView('split')" data-i18n="viewSplit">Yan Yana</button>
+        <button class="toggle-btn" id="toggle-unified" onclick="setView('unified')" data-i18n="viewUnified">Birleşik</button>
+      </div>
+    </div>
+    <div class="separator"></div>
+    <label class="checkbox-label">
+      <input type="checkbox" id="optLineNumbers" checked> <span data-i18n="optLines">Satır No</span>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="optIgnoreCase"> <span data-i18n="optCase">Büyük/Küçük Harf Yok Say</span>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="optIgnoreWhitespace"> <span data-i18n="optWS">Boşlukları Yok Say</span>
+    </label>
+    <label class="checkbox-label">
+      <input type="checkbox" id="optWordDiff" checked> <span data-i18n="optWord">Kelime Diff</span>
+    </label>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row" id="statsRow" style="display:none">
+    <div class="stat-card stat-added">
+      <div class="stat-num" id="statAdded">0</div>
+      <div class="stat-label" data-i18n="statAdded">➕ Eklenen Satır</div>
+    </div>
+    <div class="stat-card stat-deleted">
+      <div class="stat-num" id="statDeleted">0</div>
+      <div class="stat-label" data-i18n="statDeleted">➖ Silinen Satır</div>
+    </div>
+    <div class="stat-card stat-modified">
+      <div class="stat-num" id="statModified">0</div>
+      <div class="stat-label" data-i18n="statModified">✏️ Değiştirilen</div>
+    </div>
+    <div class="stat-card stat-unchanged">
+      <div class="stat-num" id="statUnchanged">0</div>
+      <div class="stat-label" data-i18n="statUnchanged">✓ Değişmeyen</div>
+    </div>
+  </div>
+
+  <!-- RESULTS PANEL -->
+  <div class="results-panel" id="resultsPanel">
+    <div class="results-header">
+      <div class="results-title">
+        <span>🔍</span>
+        <span data-i18n="resultsTitle">Karşılaştırma Sonuçları</span>
+      </div>
+      <div class="results-actions">
+        <button class="btn-export" onclick="exportHTML()" data-i18n="exportHTML">⬇️ HTML Dışa Aktar</button>
+        <button class="btn-export" onclick="exportText()" data-i18n="exportText">📄 Metin Dışa Aktar</button>
+        <button class="btn-export" onclick="copyResult()" data-i18n="copyResult">📋 Sonucu Kopyala</button>
+      </div>
+    </div>
+    <!-- Change Navigator -->
+    <div class="change-nav" id="changeNav" style="display:none">
+      <button class="btn-nav" id="btnPrevChange" onclick="prevChange()" data-i18n-title="navPrevTitle" disabled data-i18n="navPrev">↑ Önceki</button>
+      <button class="btn-nav" id="btnNextChange" onclick="nextChange()" data-i18n-title="navNextTitle" disabled data-i18n="navNext">↓ Sonraki</button>
+      <div class="change-nav-counter" id="changeNavCounter">— / —</div>
+      <div class="change-nav-label" data-i18n="navChange">değişiklik</div>
+      <div class="change-nav-types" id="changeNavTypes"></div>
+      <div class="change-nav-hint" id="changeNavHint">F7 · Shift+F7</div>
+    </div>
+
+    <div class="diff-container" id="diffContainer">
+      <div class="empty-state">
+        <div class="empty-state-icon">🔀</div>
+        <div class="empty-state-text" data-i18n="emptyStateText">İki metin veya dosya girin</div>
+        <div class="empty-state-hint" data-i18n="emptyStateHint">Karşılaştır düğmesine basarak farkları görün</div>
+      </div>
+    </div>
+    <div class="legend" id="legendBar" style="display:none">
+      <div class="legend-item"><div class="legend-dot add"></div> <span data-i18n="legendAdded">Eklendi</span></div>
+      <div class="legend-item"><div class="legend-dot del"></div> <span data-i18n="legendDeleted">Silindi</span></div>
+      <div class="legend-item"><div class="legend-dot unchanged"></div> <span data-i18n="legendUnchanged">Değişmedi</span></div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <span data-i18n="footer">Tamamen tarayıcı tabanlı — hiçbir veri sunucuya gönderilmez</span> &nbsp;·&nbsp; ⚡ DiffTool
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── I18N ─────────────────────────────────────────────────────────────────────
+const translations = {
+  tr: {
+    headerMeta: 'v1.6 · Tamamen yerel · Sunucuya veri gönderilmez',
+    tabText: '✏️ Metin',
+    tabFile: '📂 Dosya',
+    fileTypes: 'TXT, JS, PY, HTML, CSS, JSON, XML, MD, CSV ve daha fazlası desteklenir',
+    origText: 'Orijinal Metin',
+    modText: 'Değiştirilmiş Metin',
+    origFile: 'Orijinal Dosya',
+    modFile: 'Değiştirilmiş Dosya',
+    btnCopy: '📋 Kopyala',
+    btnClear: '🗑️ Temizle',
+    placeholderA: 'Karşılaştırmak istediğiniz ilk metni buraya yapıştırın...',
+    placeholderB: 'Karşılaştırmak istediğiniz ikinci metni buraya yapıştırın...',
+    dropText: 'Dosyayı sürükleyip bırakın',
+    dropHint: 'veya tıklayarak seçin',
+    btnCompare: '⚡ Karşılaştır',
+    view: 'Görünüm:',
+    viewSplit: 'Yan Yana',
+    viewUnified: 'Birleşik',
+    optLines: 'Satır No',
+    optCase: 'Büyük/Küçük Harf Yok Say',
+    optWS: 'Boşlukları Yok Say',
+    optWord: 'Kelime Diff',
+    statAdded: '➕ Eklenen Satır',
+    statDeleted: '➖ Silinen Satır',
+    statModified: '✏️ Değiştirilen',
+    statUnchanged: '✓ Değişmeyen',
+    resultsTitle: 'Karşılaştırma Sonuçları',
+    exportHTML: '⬇️ HTML Dışa Aktar',
+    exportText: '📄 Metin Dışa Aktar',
+    copyResult: '📋 Sonucu Kopyala',
+    emptyStateText: 'İki metin veya dosya girin',
+    emptyStateHint: 'Karşılaştır düğmesine basarak farkları görün',
+    legendAdded: 'Eklendi',
+    legendDeleted: 'Silindi',
+    legendUnchanged: 'Değişmedi',
+    footer: 'Tamamen tarayıcı tabanlı — hiçbir veri sunucuya gönderilmez',
+    // dynamic toasts & messages
+    toastNoFiles: 'Lütfen her iki dosyayı da yükleyin',
+    toastNoFileA: 'A dosyasını yükleyin',
+    toastNoFileB: 'B dosyasını yükleyin',
+    toastNoText: 'Karşılaştırılacak metin yok',
+    toastDone: (n) => `Karşılaştırma tamamlandı · ${n} değişiklik`,
+    toastCompareFirst: 'Önce karşılaştırın',
+    toastNoCopy: 'Kopyalanacak metin yok',
+    toastCopied: 'Kopyalandı!',
+    toastResultCopied: 'Sonuç kopyalandı!',
+    toastDownloaded: (name) => `${name} indirildi`,
+    toastFileError: 'Dosya okunamadı',
+    diffColA: 'A — Orijinal',
+    diffColB: 'B — Değiştirilmiş',
+    lineCount: (lines, chars) => `${lines} satır · ${chars} karakter`,
+    navPrev: '↑ Önceki',
+    navNext: '↓ Sonraki',
+    navChange: 'değişiklik',
+    navPrevTitle: 'Önceki değişiklik (Shift+F7)',
+    navNextTitle: 'Sonraki değişiklik (F7)',
+    navAdded: 'eklendi',
+    navDeleted: 'silindi',
+    navModified: 'değişti',
+    collapseLabel: (n) => `<span class="collapse-sep-count">${n} satır</span> değişmedi — görmek için tıkla`,
+  },
+  en: {
+    headerMeta: 'v1.6 · Fully local · No data sent to server',
+    tabText: '✏️ Text',
+    tabFile: '📂 File',
+    fileTypes: 'TXT, JS, PY, HTML, CSS, JSON, XML, MD, CSV and more supported',
+    origText: 'Original Text',
+    modText: 'Modified Text',
+    origFile: 'Original File',
+    modFile: 'Modified File',
+    btnCopy: '📋 Copy',
+    btnClear: '🗑️ Clear',
+    placeholderA: 'Paste the first text to compare here...',
+    placeholderB: 'Paste the second text to compare here...',
+    dropText: 'Drag & drop a file here',
+    dropHint: 'or click to browse',
+    btnCompare: '⚡ Compare',
+    view: 'View:',
+    viewSplit: 'Split',
+    viewUnified: 'Unified',
+    optLines: 'Line Nos',
+    optCase: 'Ignore Case',
+    optWS: 'Ignore Whitespace',
+    optWord: 'Word Diff',
+    statAdded: '➕ Added Lines',
+    statDeleted: '➖ Deleted Lines',
+    statModified: '✏️ Modified',
+    statUnchanged: '✓ Unchanged',
+    resultsTitle: 'Comparison Results',
+    exportHTML: '⬇️ Export HTML',
+    exportText: '📄 Export Text',
+    copyResult: '📋 Copy Result',
+    emptyStateText: 'Enter two texts or files',
+    emptyStateHint: 'Press Compare to see the differences',
+    legendAdded: 'Added',
+    legendDeleted: 'Deleted',
+    legendUnchanged: 'Unchanged',
+    footer: 'Fully browser-based — no data is sent to a server',
+    // dynamic toasts & messages
+    toastNoFiles: 'Please upload both files',
+    toastNoFileA: 'Upload file A',
+    toastNoFileB: 'Upload file B',
+    toastNoText: 'No text to compare',
+    toastDone: (n) => `Comparison done · ${n} changes`,
+    toastCompareFirst: 'Compare first',
+    toastNoCopy: 'No text to copy',
+    toastCopied: 'Copied!',
+    toastResultCopied: 'Result copied!',
+    toastDownloaded: (name) => `${name} downloaded`,
+    toastFileError: 'Could not read file',
+    diffColA: 'A — Original',
+    diffColB: 'B — Modified',
+    lineCount: (lines, chars) => `${lines} lines · ${chars} chars`,
+    navPrev: '↑ Previous',
+    navNext: '↓ Next',
+    navChange: 'change',
+    navPrevTitle: 'Previous change (Shift+F7)',
+    navNextTitle: 'Next change (F7)',
+    navAdded: 'added',
+    navDeleted: 'deleted',
+    navModified: 'modified',
+    collapseLabel: (n) => `<span class="collapse-sep-count">${n} lines</span> unchanged — click to expand`,
+  }
+};
+
+let currentLang = 'tr';
+
+function setLang(lang) {
+  currentLang = lang;
+  document.getElementById('lang-tr').classList.toggle('active', lang === 'tr');
+  document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+  document.documentElement.lang = lang;
+
+  const t = translations[lang];
+
+  // header meta
+  document.getElementById('header-meta').textContent = t.headerMeta;
+
+  // data-i18n elements
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (t[key] !== undefined) el.textContent = t[key];
+  });
+
+  // placeholders
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (t[key] !== undefined) el.placeholder = t[key];
+  });
+
+  // title attributes
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const key = el.getAttribute('data-i18n-title');
+    if (t[key] !== undefined) el.title = t[key];
+  });
+
+  // update char counts with translated format
+  updateCount('a');
+  updateCount('b');
+
+  // re-render diff columns if result exists
+  if (lastDiffResult) renderDiff(lastDiffResult);
+}
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let currentTab = 'text';
+let currentView = 'split';
+let fileContentA = null;
+let fileContentB = null;
+let lastDiffResult = null;
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-text').classList.toggle('hidden', tab !== 'text');
+  document.getElementById('tab-file').classList.toggle('hidden', tab !== 'file');
+  document.querySelectorAll('.tab').forEach((el, i) => {
+    el.classList.toggle('active', (i === 0 && tab === 'text') || (i === 1 && tab === 'file'));
+  });
+}
+
+function setView(v) {
+  currentView = v;
+  document.getElementById('toggle-split').classList.toggle('active', v === 'split');
+  document.getElementById('toggle-unified').classList.toggle('active', v === 'unified');
+  if (lastDiffResult) renderDiff(lastDiffResult);
+}
+
+// ─── CHAR COUNT ────────────────────────────────────────────────────────────────
+function updateCount(side) {
+  const el = document.getElementById('text' + side.toUpperCase());
+  const counter = document.getElementById('count' + side.toUpperCase());
+  const lines = el.value === '' ? 0 : el.value.split('\n').length;
+  const t = translations[currentLang];
+  counter.textContent = t.lineCount(lines, el.value.length);
+}
+
+function copyText(side) {
+  const val = document.getElementById('text' + side.toUpperCase()).value;
+  const t = translations[currentLang];
+  if (!val) return showToast(t.toastNoCopy, 'error');
+  navigator.clipboard.writeText(val).then(() => showToast(t.toastCopied, 'success'));
+}
+
+function clearText(side) {
+  document.getElementById('text' + side.toUpperCase()).value = '';
+  updateCount(side);
+}
+
+// ─── FILE HANDLING ────────────────────────────────────────────────────────────
+function onDragOver(e, side) {
+  e.preventDefault();
+  document.getElementById('drop' + side.toUpperCase()).classList.add('dragover');
+}
+function onDragLeave(e, side) {
+  document.getElementById('drop' + side.toUpperCase()).classList.remove('dragover');
+}
+function onDrop(e, side) {
+  e.preventDefault();
+  document.getElementById('drop' + side.toUpperCase()).classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) readFile(file, side);
+}
+function onFileSelect(e, side) {
+  const file = e.target.files[0];
+  if (file) readFile(file, side);
+}
+function readFile(file, side) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const content = e.target.result;
+    if (side === 'a') fileContentA = content;
+    else fileContentB = content;
+    showFileInfo(side, file.name, file.size);
+  };
+  reader.onerror = () => showToast(translations[currentLang].toastFileError, 'error');
+  reader.readAsText(file, 'UTF-8');
+}
+function showFileInfo(side, name, size) {
+  const S = side.toUpperCase();
+  document.getElementById('drop' + S).style.display = 'none';
+  document.getElementById('fileInfo' + S).classList.remove('hidden');
+  document.getElementById('fileName' + S).textContent = name;
+  document.getElementById('fileSize' + S).textContent = formatSize(size);
+  document.getElementById('clearFile' + S).style.display = 'flex';
+}
+function clearFile(side) {
+  const S = side.toUpperCase();
+  if (side === 'a') { fileContentA = null; document.getElementById('fileInputA').value = ''; }
+  else { fileContentB = null; document.getElementById('fileInputB').value = ''; }
+  document.getElementById('drop' + S).style.display = 'flex';
+  document.getElementById('fileInfo' + S).classList.add('hidden');
+  document.getElementById('clearFile' + S).style.display = 'none';
+}
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1048576).toFixed(1) + ' MB';
+}
+
+// ─── DIFF ALGORITHM (Myers-like LCS) ─────────────────────────────────────────
+function lcs(a, b) {
+  const n = a.length, m = b.length;
+  if (n === 0 || m === 0) return [];
+  // For large files, use greedy approach
+  if (n * m > 200000) return lcsGreedy(a, b);
+  const dp = [];
+  for (let i = 0; i <= n; i++) { dp[i] = new Array(m+1).fill(0); }
+  for (let i = 1; i <= n; i++)
+    for (let j = 1; j <= m; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
+  // backtrack
+  const seq = [];
+  let i = n, j = m;
+  while (i > 0 && j > 0) {
+    if (a[i-1] === b[j-1]) { seq.unshift([i-1,j-1]); i--; j--; }
+    else if (dp[i-1][j] > dp[i][j-1]) i--;
+    else j--;
+  }
+  return seq;
+}
+
+function lcsGreedy(a, b) {
+  // Patience-like approximation for large inputs
+  const result = [];
+  const bMap = new Map();
+  b.forEach((v,i) => { if (!bMap.has(v)) bMap.set(v,[]); bMap.get(v).push(i); });
+  let prevJ = -1;
+  for (let i = 0; i < a.length; i++) {
+    const positions = bMap.get(a[i]);
+    if (!positions) continue;
+    for (const j of positions) {
+      if (j > prevJ) { result.push([i,j]); prevJ = j; break; }
+    }
+  }
+  return result;
+}
+
+function computeDiff(textA, textB) {
+  let linesA = textA.split('\n');
+  let linesB = textB.split('\n');
+  if (linesA[linesA.length-1] === '' && linesB[linesB.length-1] === '') {
+    linesA.pop(); linesB.pop();
+  }
+
+  const ignCase = document.getElementById('optIgnoreCase').checked;
+  const ignWS   = document.getElementById('optIgnoreWhitespace').checked;
+
+  const normalize = (s) => {
+    let r = s;
+    if (ignCase) r = r.toLowerCase();
+    if (ignWS) r = r.replace(/\s+/g,' ').trim();
+    return r;
+  };
+
+  const normA = linesA.map(normalize);
+  const normB = linesB.map(normalize);
+
+  const common = lcs(normA, normB);
+  const commonA = new Set(common.map(p=>p[0]));
+  const commonB = new Set(common.map(p=>p[1]));
+
+  const ops = []; // {type, lineA, lineB, textA, textB}
+  let ci = 0, ai = 0, bi = 0;
+
+  while (ai < linesA.length || bi < linesB.length) {
+    if (ci < common.length) {
+      const [ca, cb] = common[ci];
+      // drain deletions
+      while (ai < ca) {
+        ops.push({type:'del', lineA:ai+1, textA:linesA[ai]});
+        ai++;
+      }
+      // drain insertions
+      while (bi < cb) {
+        ops.push({type:'add', lineB:bi+1, textB:linesB[bi]});
+        bi++;
+      }
+      ops.push({type:'eq', lineA:ai+1, lineB:bi+1, textA:linesA[ai], textB:linesB[bi]});
+      ai++; bi++; ci++;
+    } else {
+      while (ai < linesA.length) {
+        ops.push({type:'del', lineA:ai+1, textA:linesA[ai]});
+        ai++;
+      }
+      while (bi < linesB.length) {
+        ops.push({type:'add', lineB:bi+1, textB:linesB[bi]});
+        bi++;
+      }
+    }
+  }
+
+  // Pair del+add as modify
+  const result = [];
+  for (let i = 0; i < ops.length; i++) {
+    if (ops[i].type === 'del' && i+1 < ops.length && ops[i+1].type === 'add') {
+      result.push({type:'mod', lineA:ops[i].lineA, lineB:ops[i+1].lineB, textA:ops[i].textA, textB:ops[i+1].textB});
+      i++;
+    } else {
+      result.push(ops[i]);
+    }
+  }
+
+  return result;
+}
+
+// ─── WORD DIFF ──────────────────────────────────────────────────────────────
+function wordDiff(oldLine, newLine) {
+  const wordsA = tokenize(oldLine);
+  const wordsB = tokenize(newLine);
+  const seq = lcs(wordsA, wordsB);
+  const matchA = new Set(seq.map(p=>p[0]));
+  const matchB = new Set(seq.map(p=>p[1]));
+  let htmlA = '', htmlB = '';
+  wordsA.forEach((w,i) => {
+    htmlA += matchA.has(i) ? esc(w) : `<span class="word-del">${esc(w)}</span>`;
+  });
+  wordsB.forEach((w,i) => {
+    htmlB += matchB.has(i) ? esc(w) : `<span class="word-add">${esc(w)}</span>`;
+  });
+  return {htmlA, htmlB};
+}
+
+function tokenize(s) {
+  return s.match(/\S+|\s+/g) || [''];
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── STATS ───────────────────────────────────────────────────────────────────
+function calcStats(diff) {
+  let added=0, deleted=0, modified=0, unchanged=0;
+  diff.forEach(op => {
+    if (op.type==='add') added++;
+    else if (op.type==='del') deleted++;
+    else if (op.type==='mod') modified++;
+    else unchanged++;
+  });
+  return {added,deleted,modified,unchanged};
+}
+
+// ─── RUN DIFF ─────────────────────────────────────────────────────────────────
+function runDiff() {
+  let textA, textB;
+  if (currentTab === 'text') {
+    textA = document.getElementById('textA').value;
+    textB = document.getElementById('textB').value;
+  } else {
+    textA = fileContentA || '';
+    textB = fileContentB || '';
+    const t = translations[currentLang];
+    if (!fileContentA && !fileContentB) return showToast(t.toastNoFiles, 'error');
+    if (!fileContentA) return showToast(t.toastNoFileA, 'error');
+    if (!fileContentB) return showToast(t.toastNoFileB, 'error');
+  }
+
+  if (!textA && !textB) return showToast(translations[currentLang].toastNoText, 'error');
+
+  const diff = computeDiff(textA, textB);
+  lastDiffResult = diff;
+
+  const stats = calcStats(diff);
+  document.getElementById('statAdded').textContent = stats.added;
+  document.getElementById('statDeleted').textContent = stats.deleted;
+  document.getElementById('statModified').textContent = stats.modified;
+  document.getElementById('statUnchanged').textContent = stats.unchanged;
+  document.getElementById('statsRow').style.display = 'grid';
+
+  renderDiff(diff);
+  showToast(translations[currentLang].toastDone(stats.added + stats.deleted + stats.modified), 'success');
+}
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function renderDiff(diff) {
+  const container = document.getElementById('diffContainer');
+  const showNums = document.getElementById('optLineNumbers').checked;
+  const wordDiffOn = document.getElementById('optWordDiff').checked;
+
+  if (currentView === 'split') {
+    renderSplit(diff, container, showNums, wordDiffOn);
+  } else {
+    renderUnified(diff, container, showNums, wordDiffOn);
+  }
+  document.getElementById('legendBar').style.display = 'flex';
+  buildChangeNav();
+}
+
+const CONTEXT_LINES = 3;
+
+function computeVisibleSet(diff) {
+  const visible = new Set();
+  diff.forEach((op, i) => {
+    if (op.type !== 'eq') {
+      for (let j = Math.max(0, i - CONTEXT_LINES); j <= Math.min(diff.length - 1, i + CONTEXT_LINES); j++) {
+        visible.add(j);
+      }
+    }
+  });
+  // If nothing changed, show everything
+  if (visible.size === 0) diff.forEach((_, i) => visible.add(i));
+  return visible;
+}
+
+function renderSplit(diff, container, showNums, wordDiffOn) {
+  const visible = computeVisibleSet(diff);
+
+  // Build groups: [{type:'visible', ops:[...]}, {type:'collapsed', ops:[...]}]
+  const groups = [];
+  let i = 0;
+  while (i < diff.length) {
+    if (visible.has(i)) {
+      const group = { type: 'visible', ops: [] };
+      while (i < diff.length && visible.has(i)) { group.ops.push({ op: diff[i], idx: i }); i++; }
+      groups.push(group);
+    } else {
+      const group = { type: 'collapsed', ops: [] };
+      while (i < diff.length && !visible.has(i)) { group.ops.push({ op: diff[i], idx: i }); i++; }
+      groups.push(group);
+    }
+  }
+
+  const isTr = currentLang === 'tr';
+
+  function lineRow(cls, numSpan, sign, content, changeAttrs = '') {
+    return `<div class="diff-line ${cls}" ${changeAttrs}>${numSpan}<span class="line-sign">${sign}</span><span class="line-content">${content}</span></div>`;
+  }
+  function blankRow() {
+    return `<div class="diff-line context"><span class="line-num"></span><span class="line-sign"> </span><span class="line-content"></span></div>`;
+  }
+
+  let leftHTML = '', rightHTML = '';
+  let collapseId = 0;
+
+  groups.forEach(group => {
+    if (group.type === 'collapsed') {
+      const count = group.ops.length;
+      const firstOp = group.ops[0].op, lastOp = group.ops[group.ops.length - 1].op;
+      const rangeA = showNums ? `${firstOp.lineA}–${lastOp.lineA}` : '';
+      const rangeB = showNums ? `${firstOp.lineB}–${lastOp.lineB}` : '';
+      const cid = 'collapse-' + (collapseId++);
+      const label = translations[currentLang].collapseLabel(count);
+
+      const sepRowLeft = `<div class="diff-line collapse-sep" data-collapse-id="${cid}" data-side="left" onclick="expandCollapse('${cid}')">
+        <span class="collapse-sep-label"><span class="expand-icon">⊕</span>${rangeA ? `<span style="color:var(--text3);font-size:11px">${rangeA}</span>` : ''}${label}</span>
+      </div>`;
+      const sepRowRight = `<div class="diff-line collapse-sep" data-collapse-id="${cid}" data-side="right" onclick="expandCollapse('${cid}')">
+        <span class="collapse-sep-label"><span class="expand-icon">⊕</span>${rangeB ? `<span style="color:var(--text3);font-size:11px">${rangeB}</span>` : ''}${label}</span>
+      </div>`;
+
+      // Hidden rows
+      let hiddenLeft = '', hiddenRight = '';
+      group.ops.forEach(({ op }) => {
+        const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
+        const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
+        hiddenLeft  += lineRow('context', ln, ' ', esc(op.textA));
+        hiddenRight += lineRow('context', rn, ' ', esc(op.textB));
+      });
+
+      leftHTML  += sepRowLeft  + `<div class="collapse-rows" id="${cid}-left"  style="display:none">${hiddenLeft}</div>`;
+      rightHTML += sepRowRight + `<div class="collapse-rows" id="${cid}-right" style="display:none">${hiddenRight}</div>`;
+
+    } else {
+      group.ops.forEach(({ op, idx }) => {
+        if (op.type === 'eq') {
+          const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
+          const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
+          leftHTML  += lineRow('context', ln, ' ', esc(op.textA));
+          rightHTML += lineRow('context', rn, ' ', esc(op.textB));
+        } else if (op.type === 'del') {
+          const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
+          leftHTML  += lineRow('deleted', ln, '−', esc(op.textA), `data-change-idx="${idx}" data-change-type="del"`);
+          rightHTML += blankRow();
+        } else if (op.type === 'add') {
+          const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
+          leftHTML  += blankRow();
+          rightHTML += lineRow('added', rn, '+', esc(op.textB), `data-change-idx="${idx}" data-change-type="add"`);
+        } else if (op.type === 'mod') {
+          const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
+          const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
+          let contA = esc(op.textA), contB = esc(op.textB);
+          if (wordDiffOn) { const wd = wordDiff(op.textA, op.textB); contA = wd.htmlA; contB = wd.htmlB; }
+          leftHTML  += lineRow('modified-a', ln, '−', contA, `data-change-idx="${idx}" data-change-type="mod"`);
+          rightHTML += lineRow('modified-b', rn, '+', contB, `data-change-idx="${idx}" data-change-type="mod"`);
+        }
+      });
+    }
+  });
+
+  container.innerHTML = `
+    <div class="diff-split">
+      <div class="diff-col">
+        <div class="diff-col-header">${translations[currentLang].diffColA}</div>
+        ${leftHTML}
+      </div>
+      <div class="diff-col">
+        <div class="diff-col-header">${translations[currentLang].diffColB}</div>
+        ${rightHTML}
+      </div>
+    </div>`;
+}
+
+function renderUnified(diff, container, showNums, wordDiffOn) {
+  const visible = computeVisibleSet(diff);
+
+  const groups = [];
+  let i = 0;
+  while (i < diff.length) {
+    if (visible.has(i)) {
+      const group = { type: 'visible', ops: [] };
+      while (i < diff.length && visible.has(i)) { group.ops.push({ op: diff[i], idx: i }); i++; }
+      groups.push(group);
+    } else {
+      const group = { type: 'collapsed', ops: [] };
+      while (i < diff.length && !visible.has(i)) { group.ops.push({ op: diff[i], idx: i }); i++; }
+      groups.push(group);
+    }
+  }
+
+  const isTr = currentLang === 'tr';
+  let html = '';
+  let collapseId = 0;
+
+  groups.forEach(group => {
+    if (group.type === 'collapsed') {
+      const count = group.ops.length;
+      const firstOp = group.ops[0].op, lastOp = group.ops[group.ops.length - 1].op;
+      const range = showNums ? `${firstOp.lineA}–${lastOp.lineA}` : '';
+      const cid = 'ucollapse-' + (collapseId++);
+      const label = translations[currentLang].collapseLabel(count);
+
+      html += `<div class="diff-line collapse-sep" onclick="expandCollapseUnified('${cid}')">
+        <span class="collapse-sep-label"><span class="expand-icon">⊕</span>${range ? `<span style="color:var(--text3);font-size:11px">${range}</span>` : ''}${label}</span>
+      </div>`;
+      let hiddenRows = '';
+      group.ops.forEach(({ op }) => {
+        const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
+        hiddenRows += `<div class="diff-line context">${ln}<span class="line-sign"> </span><span class="line-content">${esc(op.textA)}</span></div>`;
+      });
+      html += `<div class="collapse-rows" id="${cid}" style="display:none">${hiddenRows}</div>`;
+
+    } else {
+      group.ops.forEach(({ op, idx }) => {
+        if (op.type === 'eq') {
+          const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
+          html += `<div class="diff-line context">${ln}<span class="line-sign"> </span><span class="line-content">${esc(op.textA)}</span></div>`;
+        } else if (op.type === 'del') {
+          const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
+          html += `<div class="diff-line deleted" data-change-idx="${idx}" data-change-type="del">${ln}<span class="line-sign">−</span><span class="line-content">${esc(op.textA)}</span></div>`;
+        } else if (op.type === 'add') {
+          const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
+          html += `<div class="diff-line added" data-change-idx="${idx}" data-change-type="add">${rn}<span class="line-sign">+</span><span class="line-content">${esc(op.textB)}</span></div>`;
+        } else if (op.type === 'mod') {
+          const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
+          const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
+          let contA = esc(op.textA), contB = esc(op.textB);
+          if (wordDiffOn) { const wd = wordDiff(op.textA, op.textB); contA = wd.htmlA; contB = wd.htmlB; }
+          html += `<div class="diff-line modified-a" data-change-idx="${idx}" data-change-type="mod">${ln}<span class="line-sign">−</span><span class="line-content">${contA}</span></div>`;
+          html += `<div class="diff-line modified-b" data-change-idx="${idx}" data-change-type="mod">${rn}<span class="line-sign">+</span><span class="line-content">${contB}</span></div>`;
+        }
+      });
+    }
+  });
+
+  container.innerHTML = `<div class="diff-unified">${html}</div>`;
+}
+
+// ─── EXPAND COLLAPSED SECTIONS ────────────────────────────────────────────────
+function expandCollapse(cid) {
+  const leftRows  = document.getElementById(cid + '-left');
+  const rightRows = document.getElementById(cid + '-right');
+  const seps = document.querySelectorAll(`[data-collapse-id="${cid}"]`);
+  if (!leftRows) return;
+  const isHidden = leftRows.style.display === 'none';
+  leftRows.style.display  = isHidden ? '' : 'none';
+  rightRows.style.display = isHidden ? '' : 'none';
+  seps.forEach(s => {
+    s.style.display = isHidden ? 'none' : '';
+    const icon = s.querySelector('.expand-icon');
+    if (icon) icon.textContent = isHidden ? '⊖' : '⊕';
+  });
+  if (isHidden) buildChangeNav(); // refresh nav after expanding
+}
+
+function expandCollapseUnified(cid) {
+  const rows = document.getElementById(cid);
+  const sep  = rows ? rows.previousElementSibling : null;
+  if (!rows) return;
+  const isHidden = rows.style.display === 'none';
+  rows.style.display = isHidden ? '' : 'none';
+  if (sep) {
+    sep.style.display = isHidden ? 'none' : '';
+    const icon = sep.querySelector('.expand-icon');
+    if (icon) icon.textContent = isHidden ? '⊖' : '⊕';
+  }
+  if (isHidden) buildChangeNav();
+}
+
+// ─── CHANGE NAVIGATOR ─────────────────────────────────────────────────────────
+let changeElements = [];
+let currentChangeIdx = -1;
+
+function buildChangeNav() {
+  const seen = new Set();
+  changeElements = [];
+
+  // Collect one representative element per change index (first in DOM order)
+  document.querySelectorAll('#diffContainer [data-change-idx]').forEach(el => {
+    const key = el.getAttribute('data-change-idx');
+    if (!seen.has(key)) {
+      seen.add(key);
+      changeElements.push(el);
+    }
+  });
+
+  currentChangeIdx = -1;
+  const nav = document.getElementById('changeNav');
+
+  if (changeElements.length === 0) {
+    nav.style.display = 'none';
+    return;
+  }
+
+  nav.style.display = 'flex';
+  updateChangeNavUI();
+
+  // Build type summary
+  const counts = { add: 0, del: 0, mod: 0 };
+  changeElements.forEach(el => {
+    const t = el.getAttribute('data-change-type');
+    if (counts[t] !== undefined) counts[t]++;
+  });
+  const types = document.getElementById('changeNavTypes');
+  const t = translations[currentLang];
+  let typesHTML = '';
+  if (counts.add > 0) typesHTML += `<span class="nav-type-dot add"></span><span style="font-size:11px;font-family:var(--mono);color:var(--add)">${counts.add} ${t.navAdded}</span>`;
+  if (counts.del > 0) typesHTML += `<span class="nav-type-dot del"></span><span style="font-size:11px;font-family:var(--mono);color:var(--del)">${counts.del} ${t.navDeleted}</span>`;
+  if (counts.mod > 0) typesHTML += `<span class="nav-type-dot mod"></span><span style="font-size:11px;font-family:var(--mono);color:var(--mod)">${counts.mod} ${t.navModified}</span>`;
+  types.innerHTML = typesHTML;
+}
+
+function updateChangeNavUI() {
+  const total = changeElements.length;
+  const counter = document.getElementById('changeNavCounter');
+  counter.textContent = total === 0 ? '— / —' : currentChangeIdx >= 0 ? `${currentChangeIdx + 1} / ${total}` : `— / ${total}`;
+  document.getElementById('btnPrevChange').disabled = total === 0;
+  document.getElementById('btnNextChange').disabled = total === 0;
+}
+
+function nextChange() {
+  if (changeElements.length === 0) return;
+  currentChangeIdx = (currentChangeIdx + 1) % changeElements.length;
+  scrollToChange();
+}
+
+function prevChange() {
+  if (changeElements.length === 0) return;
+  currentChangeIdx = (currentChangeIdx - 1 + changeElements.length) % changeElements.length;
+  scrollToChange();
+}
+
+function scrollToChange() {
+  const el = changeElements[currentChangeIdx];
+  if (!el) return;
+
+  // Scroll the diff-container so the target line is visible
+  const diffContainer = document.getElementById('diffContainer');
+  const containerRect = diffContainer.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  const relTop = elRect.top - containerRect.top + diffContainer.scrollTop;
+  const targetScroll = relTop - diffContainer.clientHeight / 2 + elRect.height / 2;
+  diffContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
+
+  // Also handle sibling elements with same data-change-idx (split view both sides)
+  const idx = el.getAttribute('data-change-idx');
+  document.querySelectorAll(`#diffContainer [data-change-idx="${idx}"]`).forEach(sibling => {
+    sibling.classList.remove('change-highlight');
+  });
+  void el.offsetWidth;
+  document.querySelectorAll(`#diffContainer [data-change-idx="${idx}"]`).forEach(sibling => {
+    sibling.classList.add('change-highlight');
+  });
+
+  updateChangeNavUI();
+}
+
+// ─── EXPORT ───────────────────────────────────────────────────────────────────
+function exportHTML() {
+  if (!lastDiffResult) return showToast(translations[currentLang].toastCompareFirst, 'error');
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Diff Sonucu</title><style>
+body{font-family:monospace;background:#0d0f14;color:#e2e8f0;padding:20px}
+.diff-line{display:flex;min-height:22px;line-height:1.65}
+.line-num{min-width:44px;text-align:right;padding-right:12px;color:#64748b;font-size:11px;border-right:1px solid #2a2f3d}
+.line-sign{width:20px;text-align:center}
+.line-content{flex:1;padding:0 14px;white-space:pre-wrap;word-break:break-all}
+.added{background:#0f2a1a}.deleted{background:#2a1218}.modified-a{background:#2a1218}.modified-b{background:#0f2a1a}
+.added .line-sign{color:#4ade80}.deleted .line-sign{color:#ff5c6c}.modified-a .line-sign{color:#ff5c6c}.modified-b .line-sign{color:#4ade80}
+.word-del{background:rgba(255,92,108,.35);text-decoration:line-through;color:#ffa7b0}
+.word-add{background:rgba(74,222,128,.3);color:#86efac}
+</style></head><body>
+${document.getElementById('diffContainer').innerHTML}
+</body></html>`;
+  download('diff-sonuc.html', html, 'text/html');
+}
+
+function exportText() {
+  if (!lastDiffResult) return showToast(translations[currentLang].toastCompareFirst, 'error');
+  let out = '';
+  lastDiffResult.forEach(op => {
+    if (op.type==='eq') out += '  ' + op.textA + '\n';
+    else if (op.type==='del') out += '- ' + op.textA + '\n';
+    else if (op.type==='add') out += '+ ' + op.textB + '\n';
+    else if (op.type==='mod') { out += '- ' + op.textA + '\n'; out += '+ ' + op.textB + '\n'; }
+  });
+  download('diff-sonuc.txt', out, 'text/plain');
+}
+
+function copyResult() {
+  if (!lastDiffResult) return showToast(translations[currentLang].toastCompareFirst, 'error');
+  let out = '';
+  lastDiffResult.forEach(op => {
+    if (op.type==='eq') out += '  ' + op.textA + '\n';
+    else if (op.type==='del') out += '- ' + op.textA + '\n';
+    else if (op.type==='add') out += '+ ' + op.textB + '\n';
+    else if (op.type==='mod') { out += '- ' + op.textA + '\n'; out += '+ ' + op.textB + '\n'; }
+  });
+  navigator.clipboard.writeText(out).then(() => showToast(translations[currentLang].toastResultCopied, 'success'));
+}
+
+function download(name, content, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], {type}));
+  a.download = name;
+  a.click();
+  showToast(translations[currentLang].toastDownloaded(name), 'success');
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = (type==='success' ? '✓ ' : type==='error' ? '✕ ' : '') + msg;
+  t.className = 'toast show' + (type ? ' '+type : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ─── KEYBOARD SHORTCUT ────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); runDiff(); }
+  if (e.key === 'F7') { e.preventDefault(); e.shiftKey ? prevChange() : nextChange(); }
+});
+</script>
+</body>
+</html>
