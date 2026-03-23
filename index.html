@@ -746,6 +746,7 @@
   .fullscreen-diff-container .diff-container {
     max-height: none !important;
     overflow: visible !important;
+    font-size: inherit !important;
   }
   .fullscreen-legend {
     display: flex;
@@ -1005,11 +1006,11 @@
         <span data-i18n="resultsTitle">Karşılaştırma Sonuçları</span>
       </div>
       <div class="fullscreen-controls">
-        <button class="btn-zoom" onclick="fsZoom(-1)" title="Küçült">−</button>
+        <button class="btn-zoom" onclick="fsZoom(-1)" data-i18n-title="fsZoomOut" title="Küçült">−</button>
         <div class="zoom-level-display" id="fsZoomLabel">100%</div>
-        <button class="btn-zoom" onclick="fsZoom(+1)" title="Büyüt">+</button>
-        <button class="btn-zoom" onclick="fsZoomReset()" title="Sıfırla" style="min-width:52px;">⟳ Sıfırla</button>
-        <button class="btn-close-fs" onclick="closeFullscreen()">✕ Kapat</button>
+        <button class="btn-zoom" onclick="fsZoom(+1)" data-i18n-title="fsZoomIn" title="Büyüt">+</button>
+        <button class="btn-zoom" onclick="fsZoomReset()" data-i18n-title="fsZoomResetTitle" data-i18n="fsZoomReset" title="Sıfırla" style="min-width:52px;">⟳ Sıfırla</button>
+        <button class="btn-close-fs" onclick="closeFullscreen()" data-i18n="fsClose">✕ Kapat</button>
       </div>
     </div>
     <!-- Change Navigator (mirrored) -->
@@ -1094,6 +1095,11 @@ const translations = {
     navDeleted: 'silindi',
     navModified: 'değişti',
     collapseLabel: (n) => `<span class="collapse-sep-count">${n} satır</span> değişmedi — görmek için tıkla`,
+    fsZoomOut: 'Küçült',
+    fsZoomIn: 'Büyüt',
+    fsZoomResetTitle: 'Sıfırla',
+    fsZoomReset: '⟳ Sıfırla',
+    fsClose: '✕ Kapat',
   },
   en: {
     headerMeta: 'v1.6 · Fully local · No data sent to server',
@@ -1156,6 +1162,11 @@ const translations = {
     navDeleted: 'deleted',
     navModified: 'modified',
     collapseLabel: (n) => `<span class="collapse-sep-count">${n} lines</span> unchanged — click to expand`,
+    fsZoomOut: 'Zoom Out',
+    fsZoomIn: 'Zoom In',
+    fsZoomResetTitle: 'Reset',
+    fsZoomReset: '⟳ Reset',
+    fsClose: '✕ Close',
   }
 };
 
@@ -1603,7 +1614,7 @@ function renderUnified(diff, container, showNums, wordDiffOn) {
       const cid = 'ucollapse-' + (collapseId++);
       const label = translations[currentLang].collapseLabel(count);
 
-      html += `<div class="diff-line collapse-sep" onclick="expandCollapseUnified('${cid}')">
+      html += `<div class="diff-line collapse-sep" data-collapse-id="${cid}" onclick="expandCollapseUnified('${cid}')">
         <span class="collapse-sep-label"><span class="expand-icon">⊕</span>${range ? `<span style="color:var(--text3);font-size:11px">${range}</span>` : ''}${label}</span>
       </div>`;
       let hiddenRows = '';
@@ -1664,7 +1675,6 @@ function expandCollapseUnified(cid) {
   const isHidden = rows.style.display === 'none';
   rows.style.display = isHidden ? '' : 'none';
   if (sep) {
-    sep.style.display = isHidden ? 'none' : '';
     const icon = sep.querySelector('.expand-icon');
     if (icon) icon.textContent = isHidden ? '⊖' : '⊕';
   }
@@ -1736,23 +1746,37 @@ function scrollToChange() {
   const el = changeElements[currentChangeIdx];
   if (!el) return;
 
-  const diffContainer = document.getElementById('diffContainer');
+  const isFS = document.getElementById('fullscreenOverlay').classList.contains('active');
+  const diffContainer = isFS ? document.getElementById('fsDiffContainer') : document.getElementById('diffContainer');
+  
+  // Find the target element (original or prefixed clone)
+  const idx = el.getAttribute('data-change-idx');
+  const targetEl = isFS ? diffContainer.querySelector(`[data-change-idx="${idx}"]`) : el;
+
+  if (!targetEl) return;
+
+  // Calculate position
   const containerRect = diffContainer.getBoundingClientRect();
-  const elRect = el.getBoundingClientRect();
+  const elRect = targetEl.getBoundingClientRect();
   const relTop = elRect.top - containerRect.top + diffContainer.scrollTop;
   const targetScroll = relTop - diffContainer.clientHeight / 2 + elRect.height / 2;
+
   diffContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
 
-  const idx = el.getAttribute('data-change-idx');
-  document.querySelectorAll(`#diffContainer [data-change-idx="${idx}"]`).forEach(sibling => {
-    sibling.classList.remove('change-highlight');
+  // Update highlighting for both containers
+  document.querySelectorAll(`[data-change-idx="${idx}"]`).forEach(item => {
+    item.classList.remove('change-highlight');
   });
-  void el.offsetWidth;
-  document.querySelectorAll(`#diffContainer [data-change-idx="${idx}"]`).forEach(sibling => {
-    sibling.classList.add('change-highlight');
+  
+  // Trigger reflow for animation
+  void targetEl.offsetWidth; 
+  
+  document.querySelectorAll(`[data-change-idx="${idx}"]`).forEach(item => {
+    item.classList.add('change-highlight');
   });
 
   updateChangeNavUI();
+  if (isFS) fsSyncNav();
 }
 
 // ─── EXPORT ───────────────────────────────────────────────────────────────────
@@ -1832,9 +1856,6 @@ function openFullscreen() {
   // Deep-clone the diff DOM
   const clone = srcContainer.cloneNode(true);
 
-  // ── BUG FIX: remove the 600px max-height & overflow constraints from the clone ──
-  // The original .diff-container has max-height:600px / overflow:auto for the
-  // inline panel. Inside fullscreen, fsDiffContainer handles scrolling instead.
   clone.style.maxHeight = 'none';
   clone.style.overflow  = 'visible';
 
@@ -1877,30 +1898,26 @@ function fsSepClickHandler(e) {
   const cid = sep.getAttribute('data-collapse-id');
   if (!cid) return;
 
-  // Split view collapse (rows wrapper)
-  const wrapper = document.getElementById(cid + '-rows');
-  if (wrapper) {
-    const childRows = wrapper.querySelectorAll('.diff-split-row');
-    const isHidden  = childRows.length > 0 && childRows[0].style.display === 'none';
-    childRows.forEach(row => { row.style.display = isHidden ? '' : 'none'; });
-    document.querySelectorAll(`[data-collapse-id="${cid}"]`).forEach(s => {
-      const icon = s.querySelector('.expand-icon');
-      if (icon) icon.textContent = isHidden ? '⊖' : '⊕';
-    });
-    return;
-  }
-
-  // Unified view collapse
-  const rows = document.getElementById(cid);
-  if (rows) {
-    const prevSep = rows.previousElementSibling;
+  // Determine if we are in Unified or Split view by looking at classes
+  const isUnified = !!document.querySelector('#fsDiffContainer .diff-unified');
+  
+  if (isUnified) {
+    // Logic for Unified view expansion
+    const rows = document.getElementById(cid);
+    if (!rows) return;
     const isHidden = rows.style.display === 'none';
     rows.style.display = isHidden ? '' : 'none';
-    if (prevSep) {
-      prevSep.style.display = isHidden ? 'none' : '';
-      const icon = prevSep.querySelector('.expand-icon');
-      if (icon) icon.textContent = isHidden ? '⊖' : '⊕';
-    }
+    const icon = sep.querySelector('.expand-icon');
+    if (icon) icon.textContent = isHidden ? '⊖' : '⊕';
+  } else {
+    // Logic for Split view expansion
+    const wrapper = document.getElementById(cid + '-rows');
+    if (!wrapper) return;
+    const childRows = wrapper.querySelectorAll('.diff-split-row');
+    const isHidden = childRows.length > 0 && childRows[0].style.display === 'none';
+    childRows.forEach(row => row.style.display = isHidden ? '' : 'none');
+    const icon = sep.querySelector('.expand-icon');
+    if (icon) icon.textContent = isHidden ? '⊖' : '⊕';
   }
 }
 
@@ -1928,11 +1945,14 @@ function fsSyncNav() {
   const mainNav = document.getElementById('changeNav');
   const fsNav   = document.getElementById('fsChangeNav');
   const isVisible = mainNav.style.display !== 'none';
+  
   fsNav.style.display = isVisible ? 'flex' : 'none';
 
   if (isVisible) {
     document.getElementById('fsNavCounter').textContent = document.getElementById('changeNavCounter').textContent;
     document.getElementById('fsNavTypes').innerHTML    = document.getElementById('changeNavTypes').innerHTML;
+    
+    // Sync button states
     const prevDisabled = document.getElementById('btnPrevChange').disabled;
     const nextDisabled = document.getElementById('btnNextChange').disabled;
     document.getElementById('fsBtnPrev').disabled = prevDisabled;
