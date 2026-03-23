@@ -344,6 +344,31 @@
     z-index: 2;
   }
 
+  /* Row-paired split view */
+  .diff-split-rows { display: table; width: 100%; border-collapse: collapse; }
+  .diff-split-header-row { display: table-row; position: sticky; top: 0; z-index: 2; }
+  .diff-split-row { display: table-row; }
+  .diff-split-cell {
+    display: table-cell;
+    width: 50%;
+    border-right: 1px solid var(--border);
+    vertical-align: top;
+  }
+  .diff-split-cell:last-child { border-right: none; }
+  .diff-split-cell .diff-col-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: block;
+  }
+  /* Collapse separator spanning full row */
+  .diff-split-row.collapse-sep-row .diff-split-cell {
+    padding: 0;
+  }
+  .diff-split-row.collapse-sep-row .diff-line.collapse-sep {
+    width: 100%;
+  }
+
   .diff-line {
     display: flex;
     align-items: stretch;
@@ -611,6 +636,11 @@
     .stats-row { grid-template-columns: repeat(2, 1fr); }
     .diff-split { grid-template-columns: 1fr; }
     .diff-col:first-child { border-bottom: 1px solid var(--border); border-right: none; }
+    .diff-split-rows { display: block; }
+    .diff-split-header-row { display: flex; }
+    .diff-split-row { display: block; }
+    .diff-split-cell { display: block; width: 100%; border-right: none; }
+    .diff-split-cell:first-child { border-bottom: 1px solid var(--border); }
     .action-bar { flex-wrap: wrap; }
   }
 </style>
@@ -1308,16 +1338,17 @@ function renderSplit(diff, container, showNums, wordDiffOn) {
     }
   }
 
-  const isTr = currentLang === 'tr';
-
-  function lineRow(cls, numSpan, sign, content, changeAttrs = '') {
+  function lineCell(cls, numSpan, sign, content, changeAttrs = '') {
     return `<div class="diff-line ${cls}" ${changeAttrs}>${numSpan}<span class="line-sign">${sign}</span><span class="line-content">${content}</span></div>`;
   }
-  function blankRow() {
-    return `<div class="diff-line context"><span class="line-num"></span><span class="line-sign"> </span><span class="line-content"></span></div>`;
+  function blankCell() {
+    return `<div class="diff-line context" style="min-height:22px"><span class="line-num"></span><span class="line-sign"> </span><span class="line-content"></span></div>`;
+  }
+  function pairRow(leftCell, rightCell) {
+    return `<div class="diff-split-row"><div class="diff-split-cell">${leftCell}</div><div class="diff-split-cell">${rightCell}</div></div>`;
   }
 
-  let leftHTML = '', rightHTML = '';
+  let rowsHTML = '';
   let collapseId = 0;
 
   groups.forEach(group => {
@@ -1329,62 +1360,55 @@ function renderSplit(diff, container, showNums, wordDiffOn) {
       const cid = 'collapse-' + (collapseId++);
       const label = translations[currentLang].collapseLabel(count);
 
-      const sepRowLeft = `<div class="diff-line collapse-sep" data-collapse-id="${cid}" data-side="left" onclick="expandCollapse('${cid}')">
+      // Single separator row spanning both columns — left side drives the expand icon
+      const sepCellLeft = `<div class="diff-line collapse-sep" data-collapse-id="${cid}" data-side="left" onclick="expandCollapse('${cid}')">
         <span class="collapse-sep-label"><span class="expand-icon">⊕</span>${rangeA ? `<span style="color:var(--text3);font-size:11px">${rangeA}</span>` : ''}${label}</span>
       </div>`;
-      const sepRowRight = `<div class="diff-line collapse-sep" data-collapse-id="${cid}" data-side="right" onclick="expandCollapse('${cid}')">
+      const sepCellRight = `<div class="diff-line collapse-sep" data-collapse-id="${cid}" data-side="right" onclick="expandCollapse('${cid}')">
         <span class="collapse-sep-label"><span class="expand-icon">⊕</span>${rangeB ? `<span style="color:var(--text3);font-size:11px">${rangeB}</span>` : ''}${label}</span>
       </div>`;
 
-      // Hidden rows
-      let hiddenLeft = '', hiddenRight = '';
+      rowsHTML += `<div class="diff-split-row collapse-sep-row"><div class="diff-split-cell">${sepCellLeft}</div><div class="diff-split-cell">${sepCellRight}</div></div>`;
+
+      // Hidden content rows — paired per line
+      let hiddenPairs = '';
       group.ops.forEach(({ op }) => {
         const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
         const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
-        hiddenLeft  += lineRow('context', ln, ' ', esc(op.textA));
-        hiddenRight += lineRow('context', rn, ' ', esc(op.textB));
+        hiddenPairs += pairRow(lineCell('context', ln, ' ', esc(op.textA)), lineCell('context', rn, ' ', esc(op.textB)));
       });
-
-      leftHTML  += sepRowLeft  + `<div class="collapse-rows" id="${cid}-left"  style="display:none">${hiddenLeft}</div>`;
-      rightHTML += sepRowRight + `<div class="collapse-rows" id="${cid}-right" style="display:none">${hiddenRight}</div>`;
+      rowsHTML += `<div class="collapse-rows" id="${cid}-rows" style="display:none">${hiddenPairs}</div>`;
 
     } else {
       group.ops.forEach(({ op, idx }) => {
         if (op.type === 'eq') {
           const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
           const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
-          leftHTML  += lineRow('context', ln, ' ', esc(op.textA));
-          rightHTML += lineRow('context', rn, ' ', esc(op.textB));
+          rowsHTML += pairRow(lineCell('context', ln, ' ', esc(op.textA)), lineCell('context', rn, ' ', esc(op.textB)));
         } else if (op.type === 'del') {
           const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
-          leftHTML  += lineRow('deleted', ln, '−', esc(op.textA), `data-change-idx="${idx}" data-change-type="del"`);
-          rightHTML += blankRow();
+          rowsHTML += pairRow(lineCell('deleted', ln, '−', esc(op.textA), `data-change-idx="${idx}" data-change-type="del"`), blankCell());
         } else if (op.type === 'add') {
           const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
-          leftHTML  += blankRow();
-          rightHTML += lineRow('added', rn, '+', esc(op.textB), `data-change-idx="${idx}" data-change-type="add"`);
+          rowsHTML += pairRow(blankCell(), lineCell('added', rn, '+', esc(op.textB), `data-change-idx="${idx}" data-change-type="add"`));
         } else if (op.type === 'mod') {
           const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
           const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
           let contA = esc(op.textA), contB = esc(op.textB);
           if (wordDiffOn) { const wd = wordDiff(op.textA, op.textB); contA = wd.htmlA; contB = wd.htmlB; }
-          leftHTML  += lineRow('modified-a', ln, '−', contA, `data-change-idx="${idx}" data-change-type="mod"`);
-          rightHTML += lineRow('modified-b', rn, '+', contB, `data-change-idx="${idx}" data-change-type="mod"`);
+          rowsHTML += pairRow(lineCell('modified-a', ln, '−', contA, `data-change-idx="${idx}" data-change-type="mod"`), lineCell('modified-b', rn, '+', contB, `data-change-idx="${idx}" data-change-type="mod"`));
         }
       });
     }
   });
 
   container.innerHTML = `
-    <div class="diff-split">
-      <div class="diff-col">
-        <div class="diff-col-header">${translations[currentLang].diffColA}</div>
-        ${leftHTML}
+    <div class="diff-split-rows">
+      <div class="diff-split-header-row">
+        <div class="diff-split-cell"><div class="diff-col-header">${translations[currentLang].diffColA}</div></div>
+        <div class="diff-split-cell"><div class="diff-col-header">${translations[currentLang].diffColB}</div></div>
       </div>
-      <div class="diff-col">
-        <div class="diff-col-header">${translations[currentLang].diffColB}</div>
-        ${rightHTML}
-      </div>
+      ${rowsHTML}
     </div>`;
 }
 
@@ -1455,15 +1479,12 @@ function renderUnified(diff, container, showNums, wordDiffOn) {
 
 // ─── EXPAND COLLAPSED SECTIONS ────────────────────────────────────────────────
 function expandCollapse(cid) {
-  const leftRows  = document.getElementById(cid + '-left');
-  const rightRows = document.getElementById(cid + '-right');
+  const rows = document.getElementById(cid + '-rows');
   const seps = document.querySelectorAll(`[data-collapse-id="${cid}"]`);
-  if (!leftRows) return;
-  const isHidden = leftRows.style.display === 'none';
-  leftRows.style.display  = isHidden ? '' : 'none';
-  rightRows.style.display = isHidden ? '' : 'none';
+  if (!rows) return;
+  const isHidden = rows.style.display === 'none';
+  rows.style.display = isHidden ? '' : 'none';
   seps.forEach(s => {
-    s.style.display = isHidden ? 'none' : '';
     const icon = s.querySelector('.expand-icon');
     if (icon) icon.textContent = isHidden ? '⊖' : '⊕';
   });
