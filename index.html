@@ -368,6 +368,8 @@
   .diff-split-row.collapse-sep-row .diff-line.collapse-sep {
     width: 100%;
   }
+  /* Hidden rows wrapper — transparent to table layout so inner rows align correctly */
+  .collapse-rows { display: contents; }
 
   .diff-line {
     display: flex;
@@ -1377,7 +1379,7 @@ function renderSplit(diff, container, showNums, wordDiffOn) {
         const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
         hiddenPairs += pairRow(lineCell('context', ln, ' ', esc(op.textA)), lineCell('context', rn, ' ', esc(op.textB)));
       });
-      rowsHTML += `<div class="collapse-rows" id="${cid}-rows" style="display:none">${hiddenPairs}</div>`;
+      rowsHTML += `<div class="collapse-rows" id="${cid}-rows">${hiddenPairs.replace(/<div class="diff-split-row">/g, '<div class="diff-split-row" style="display:none">')}</div>`;
 
     } else {
       group.ops.forEach(({ op, idx }) => {
@@ -1479,16 +1481,21 @@ function renderUnified(diff, container, showNums, wordDiffOn) {
 
 // ─── EXPAND COLLAPSED SECTIONS ────────────────────────────────────────────────
 function expandCollapse(cid) {
-  const rows = document.getElementById(cid + '-rows');
-  const seps = document.querySelectorAll(`[data-collapse-id="${cid}"]`);
-  if (!rows) return;
-  const isHidden = rows.style.display === 'none';
-  rows.style.display = isHidden ? '' : 'none';
+  const wrapper = document.getElementById(cid + '-rows');
+  const seps    = document.querySelectorAll(`[data-collapse-id="${cid}"]`);
+  if (!wrapper) return;
+
+  // Since wrapper uses display:contents, toggle each child row individually
+  const childRows = wrapper.querySelectorAll('.diff-split-row');
+  const isHidden  = childRows.length > 0 && childRows[0].style.display === 'none';
+
+  childRows.forEach(row => { row.style.display = isHidden ? '' : 'none'; });
+
   seps.forEach(s => {
     const icon = s.querySelector('.expand-icon');
     if (icon) icon.textContent = isHidden ? '⊖' : '⊕';
   });
-  if (isHidden) buildChangeNav(); // refresh nav after expanding
+  if (isHidden) buildChangeNav();
 }
 
 function expandCollapseUnified(cid) {
