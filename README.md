@@ -56,6 +56,6 @@ That's it. The file is fully self-contained — one HTML file with all CSS and J
 
 ---
 
-## License
+## License 
 
 MIT — do whatever you want with it.
