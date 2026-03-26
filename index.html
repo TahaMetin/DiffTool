@@ -643,11 +643,23 @@
     border-top: 1px solid var(--border);
   }
 
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  /* Scrollbar - Enhanced for easier grabbing */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: var(--surface2); }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { 
+    background: var(--surface3); 
+    border: 2px solid var(--surface2);
+    border-radius: 5px; 
+    transition: background 0.2s;
+  }
   ::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+  ::-webkit-scrollbar-thumb:active { background: var(--accent); }
+
+  /* Firefox support */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface3) var(--surface2);
+  }
 
   /* Hidden */
   .hidden { display: none !important; }
@@ -1187,7 +1199,12 @@
       <div class="change-nav-types" id="fsNavTypes"></div>
       <div class="change-nav-hint">F7 · Shift+F7 · Esc</div>
     </div>
-    <div class="fullscreen-diff-container" id="fsDiffContainer"></div>
+    <div class="results-body" style="flex:1; overflow:hidden;">
+      <div class="fullscreen-diff-container" id="fsDiffContainer"></div>
+      <div id="fsDiffMinimap" class="diff-minimap" style="display:none">
+        <div class="minimap-viewport" id="fsMinimapViewport"></div>
+      </div>
+    </div>
     <div class="fullscreen-legend" id="fsLegend" style="display:none">
       <div class="legend-item"><div class="legend-dot add"></div> <span data-i18n="legendAdded">Eklendi</span></div>
       <div class="legend-item"><div class="legend-dot del"></div> <span data-i18n="legendDeleted">Silindi</span></div>
@@ -1872,9 +1889,16 @@ function runDiff() {
 }
 
 // ─── MINIMAP LOGIC ───────────────────────────────────────────────────────────
-function updateMinimap() {
-  const minimap = document.getElementById('diffMinimap');
-  const container = document.getElementById('diffContainer');
+let isDraggingMinimap = false;
+let dragIsFS = false;
+
+function updateMinimap(isFS = false) {
+  const minimapId = isFS ? 'fsDiffMinimap' : 'diffMinimap';
+  const containerId = isFS ? 'fsDiffContainer' : 'diffContainer';
+  
+  const minimap = document.getElementById(minimapId);
+  const container = document.getElementById(containerId);
+  
   if (!lastDiffResult || lastDiffResult.length === 0) {
     minimap.style.display = 'none';
     return;
@@ -1884,24 +1908,42 @@ function updateMinimap() {
   // Clear old markers (except viewport)
   minimap.querySelectorAll('.minimap-marker').forEach(m => m.remove());
 
-  const totalLines = lastDiffResult.length;
-  const minimapHeight = minimap.clientHeight;
+  const scrollHeight = container.scrollHeight;
+  const elements = container.querySelectorAll('[data-change-idx]');
+  const seenIdx = new Set();
 
-  lastDiffResult.forEach((op, idx) => {
-    if (op.type === 'eq') return;
+  elements.forEach(el => {
+    const idx = el.getAttribute('data-change-idx');
+    // For Split view, avoid duplicate markers for same change index
+    if (seenIdx.has(idx)) return;
+    
+    // Skip if the element is hidden (inside a collapsed section)
+    if (el.offsetParent === null) return;
+
+    seenIdx.add(idx);
+    
+    const type = el.getAttribute('data-change-type');
+    const containerRect = container.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    
+    // Actual vertical position within the scrollable content
+    const topPos = elRect.top - containerRect.top + container.scrollTop;
     
     const marker = document.createElement('div');
-    marker.className = `minimap-marker ${op.type}`;
-    marker.style.top = (idx / totalLines * 100) + '%';
+    marker.className = `minimap-marker ${type}`;
+    marker.style.top = (topPos / scrollHeight * 100) + '%';
     minimap.appendChild(marker);
   });
 
-  syncMinimapViewport();
+  syncMinimapViewport(isFS);
 }
 
-function syncMinimapViewport() {
-  const container = document.getElementById('diffContainer');
-  const viewport = document.getElementById('minimapViewport');
+function syncMinimapViewport(isFS = false) {
+  const containerId = isFS ? 'fsDiffContainer' : 'diffContainer';
+  const viewportId = isFS ? 'fsMinimapViewport' : 'minimapViewport';
+  
+  const container = document.getElementById(containerId);
+  const viewport = document.getElementById(viewportId);
   if (!container || !viewport) return;
 
   const scrollPct = container.scrollTop / container.scrollHeight;
@@ -1911,21 +1953,56 @@ function syncMinimapViewport() {
   viewport.style.height = (visiblePct * 100) + '%';
 }
 
-document.getElementById('diffContainer').addEventListener('scroll', syncMinimapViewport);
-
-document.getElementById('diffMinimap').addEventListener('click', e => {
-  const container = document.getElementById('diffContainer');
-  const rect = e.currentTarget.getBoundingClientRect();
-  const clickY = e.clientY - rect.top;
+function handleMinimapScroll(clientY, minimapEl, isFS) {
+  const containerId = isFS ? 'fsDiffContainer' : 'diffContainer';
+  const container = document.getElementById(containerId);
+  const rect = minimapEl.getBoundingClientRect();
+  
+  let clickY = clientY - rect.top;
+  clickY = Math.max(0, Math.min(clickY, rect.height));
   const clickPct = clickY / rect.height;
   
-  container.scrollTo({
-    top: clickPct * container.scrollHeight - container.clientHeight / 2,
-    behavior: 'smooth'
+  // Map the click percentage directly to the scroll height, centering the viewport
+  container.scrollTop = (clickPct * container.scrollHeight) - (container.clientHeight / 2);
+}
+
+function setupMinimapEvents(minimapId, isFS) {
+  const minimap = document.getElementById(minimapId);
+  
+  minimap.addEventListener('mousedown', e => {
+    isDraggingMinimap = true;
+    dragIsFS = isFS;
+    handleMinimapScroll(e.clientY, minimap, isFS);
+    document.body.style.cursor = 'grabbing';
   });
+}
+
+window.addEventListener('mousemove', e => {
+  if (!isDraggingMinimap) return;
+  const minimapId = dragIsFS ? 'fsDiffMinimap' : 'diffMinimap';
+  const minimap = document.getElementById(minimapId);
+  handleMinimapScroll(e.clientY, minimap, dragIsFS);
 });
 
-window.addEventListener('resize', updateMinimap);
+window.addEventListener('mouseup', () => {
+  if (isDraggingMinimap) {
+    isDraggingMinimap = false;
+    document.body.style.cursor = '';
+  }
+});
+
+setupMinimapEvents('diffMinimap', false);
+setupMinimapEvents('fsDiffMinimap', true);
+
+document.getElementById('diffContainer').addEventListener('scroll', () => syncMinimapViewport(false));
+document.getElementById('fsDiffContainer').addEventListener('scroll', () => syncMinimapViewport(true));
+
+window.addEventListener('resize', () => {
+  updateMinimap(false);
+  if (document.getElementById('fullscreenOverlay').classList.contains('active')) {
+    updateMinimap(true);
+  }
+});
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
 function renderDiff(diff) {
@@ -2139,7 +2216,9 @@ function expandCollapse(cid) {
     const icon = s.querySelector('.expand-icon');
     if (icon) icon.textContent = isHidden ? '⊖' : '⊕';
   });
-  if (isHidden) buildChangeNav();
+
+  buildChangeNav();
+  updateMinimap(document.getElementById('fullscreenOverlay').classList.contains('active'));
 }
 
 function expandCollapseUnified(cid) {
@@ -2152,7 +2231,9 @@ function expandCollapseUnified(cid) {
     const icon = sep.querySelector('.expand-icon');
     if (icon) icon.textContent = isHidden ? '⊖' : '⊕';
   }
-  if (isHidden) buildChangeNav();
+
+  buildChangeNav();
+  updateMinimap(document.getElementById('fullscreenOverlay').classList.contains('active'));
 }
 
 // ─── CHANGE NAVIGATOR ─────────────────────────────────────────────────────────
@@ -2223,31 +2304,27 @@ function scrollToChange() {
   const isFS = document.getElementById('fullscreenOverlay').classList.contains('active');
   const diffContainer = isFS ? document.getElementById('fsDiffContainer') : document.getElementById('diffContainer');
   
-  // Find the target element (original or prefixed clone)
   const idx = el.getAttribute('data-change-idx');
   const targetEl = isFS ? diffContainer.querySelector(`[data-change-idx="${idx}"]`) : el;
 
   if (!targetEl) return;
 
-  // Calculate position
+  // Calculate precise center position
   const containerRect = diffContainer.getBoundingClientRect();
   const elRect = targetEl.getBoundingClientRect();
   const relTop = elRect.top - containerRect.top + diffContainer.scrollTop;
-  const targetScroll = relTop - diffContainer.clientHeight / 2 + elRect.height / 2;
-
-  diffContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
-
-  // Update highlighting for both containers
-  document.querySelectorAll(`[data-change-idx="${idx}"]`).forEach(item => {
-    item.classList.remove('change-highlight');
-  });
   
-  // Trigger reflow for animation
-  void targetEl.offsetWidth; 
-  
-  document.querySelectorAll(`[data-change-idx="${idx}"]`).forEach(item => {
-    item.classList.add('change-highlight');
+  // Use 'auto' instead of 'smooth' for rapid F7 key support
+  diffContainer.scrollTo({ 
+    top: relTop - (containerRect.height / 2) + (elRect.height / 2), 
+    behavior: 'auto' 
   });
+
+  // Update highlighting
+  const allHighlights = document.querySelectorAll('.change-highlight');
+  allHighlights.forEach(h => h.classList.remove('change-highlight'));
+  
+  targetEl.classList.add('change-highlight');
 
   updateChangeNavUI();
   if (isFS) fsSyncNav();
@@ -2356,13 +2433,26 @@ function openFullscreen() {
   fsContainer.style.fontSize = fsZoomLevel + 'px';
   document.getElementById('fsZoomLabel').textContent = '100%';
 
-  fsSyncNav();
+  // Ensure navigation is shown in fullscreen if there are changes
+  const mainNav = document.getElementById('changeNav');
+  const fsNav   = document.getElementById('fsChangeNav');
+  if (changeElements.length > 0) {
+    fsNav.style.display = 'flex';
+    fsSyncNav();
+  } else {
+    fsNav.style.display = 'none';
+  }
 
   const legendVisible = document.getElementById('legendBar').style.display !== 'none';
   document.getElementById('fsLegend').style.display = legendVisible ? '' : 'none';
 
   overlay.classList.add('active');
   document.body.style.overflow = 'hidden';
+
+  // Wait for layout pass before calculating minimap positions
+  requestAnimationFrame(() => {
+    updateMinimap(true);
+  });
 }
 
 function fsSepClickHandler(e) {
@@ -2393,6 +2483,9 @@ function fsSepClickHandler(e) {
     const icon = sep.querySelector('.expand-icon');
     if (icon) icon.textContent = isHidden ? '⊖' : '⊕';
   }
+
+  // Refresh minimap after layout change
+  updateMinimap(true);
 }
 
 function closeFullscreen() {
