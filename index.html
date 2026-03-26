@@ -168,21 +168,46 @@
   }
   .btn-small:hover { background: var(--surface2); color: var(--text); border-color: var(--accent); }
 
+  /* EDITOR STYLE WITH LINE NUMBERS */
+  .editor-wrapper {
+    min-height: 220px;
+    max-height: 600px;
+    display: flex;
+    background: transparent;
+    overflow: hidden;
+    position: relative;
+  }
+  .input-line-numbers {
+    width: 44px;
+    padding: 14px 0;
+    background: var(--surface2);
+    border-right: 1px solid var(--border);
+    color: var(--text3);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    text-align: right;
+    padding-right: 10px;
+    user-select: none;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
   textarea {
     flex: 1;
-    min-height: 220px;
     background: transparent;
     border: none;
     color: var(--text);
     font-family: var(--mono);
     font-size: 13px;
     padding: 14px 16px;
-    resize: vertical;
+    resize: none;
     outline: none;
     line-height: 1.6;
+    white-space: pre;
+    overflow: auto;
   }
   textarea::placeholder { color: var(--text3); }
-  textarea:focus { background: rgba(79,142,247,0.03); }
+  textarea:focus { background: rgba(79,142,247,0.02); }
 
   .char-count { padding: 6px 16px; font-size: 11px; color: var(--text3); font-family: var(--mono); border-top: 1px solid var(--border); background: var(--surface2); }
 
@@ -821,6 +846,70 @@
   }
   .btn-expand-fs:hover { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 4px 14px rgba(79,142,247,0.25); }
 
+  /* HISTORY SIDEBAR */
+  .history-sidebar {
+    position: fixed;
+    top: 0; right: -320px;
+    width: 320px; height: 100%;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    z-index: 10000;
+    transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex; flex-direction: column;
+    box-shadow: -10px 0 30px rgba(0,0,0,0.3);
+  }
+  .history-sidebar.active { right: 0; }
+  .history-header {
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface2);
+  }
+  .history-title { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .history-list { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .history-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .history-item:hover { border-color: var(--accent); background: var(--surface3); }
+  .history-item-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .history-item-name { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
+  .history-item-date { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+  .history-item-meta { font-size: 11px; color: var(--accent2); font-weight: 600; }
+  .btn-delete-history {
+    background: none; border: none; color: var(--text3); cursor: pointer;
+    padding: 4px; border-radius: 4px; transition: all 0.2s;
+  }
+  .btn-delete-history:hover { color: var(--del); background: rgba(255,92,108,0.1); }
+  .history-empty { padding: 40px 20px; text-align: center; color: var(--text3); font-size: 13px; }
+  .history-footer { padding: 12px; border-top: 1px solid var(--border); }
+  
+  .btn-history-toggle {
+    padding: 6px 14px;
+    font-size: 13px;
+    font-family: var(--sans);
+    font-weight: 700;
+    border: 1px solid var(--border);
+    background: var(--surface3);
+    color: var(--text2);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-history-toggle:hover { border-color: var(--accent); color: var(--text); }
+  .history-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999;
+    display: none; opacity: 0; transition: opacity 0.3s;
+  }
+  .history-overlay.active { display: block; opacity: 1; }
+
   @media (max-width: 900px) {
     main { padding: 16px; }
     header { padding: 12px 16px; }
@@ -845,6 +934,9 @@
     Diff<span>Tool</span>
   </div>
   <div style="display:flex; align-items:center; gap:16px;">
+    <button class="btn-history-toggle" onclick="toggleHistory()">
+      <span>🕒</span> <span data-i18n="btnHistory">Geçmiş</span>
+    </button>
     <div class="lang-toggle">
       <button class="lang-btn active" id="lang-tr" onclick="setLang('tr')">TR</button>
       <button class="lang-btn" id="lang-en" onclick="setLang('en')">EN</button>
@@ -879,7 +971,10 @@
           <button class="btn-small" onclick="clearText('a')" data-i18n="btnClear">🗑️ Temizle</button>
         </div>
       </div>
-      <textarea id="textA" data-i18n-placeholder="placeholderA" placeholder="Karşılaştırmak istediğiniz ilk metni buraya yapıştırın..." oninput="updateCount('a')"></textarea>
+      <div class="editor-wrapper">
+        <div class="input-line-numbers" id="lineNumsA">1</div>
+        <textarea id="textA" data-i18n-placeholder="placeholderA" placeholder="Karşılaştırmak istediğiniz ilk metni buraya yapıştırın..." oninput="updateCount('a')" onscroll="syncInputScroll('a')"></textarea>
+      </div>
       <div class="char-count" id="countA">0 satır · 0 karakter</div>
     </div>
     <div class="panel">
@@ -893,7 +988,10 @@
           <button class="btn-small" onclick="clearText('b')" data-i18n="btnClear">🗑️ Temizle</button>
         </div>
       </div>
-      <textarea id="textB" data-i18n-placeholder="placeholderB" placeholder="Karşılaştırmak istediğiniz ikinci metni buraya yapıştırın..." oninput="updateCount('b')"></textarea>
+      <div class="editor-wrapper">
+        <div class="input-line-numbers" id="lineNumsB">1</div>
+        <textarea id="textB" data-i18n-placeholder="placeholderB" placeholder="Karşılaştırmak istediğiniz ikinci metni buraya yapıştırın..." oninput="updateCount('b')" onscroll="syncInputScroll('b')"></textarea>
+      </div>
       <div class="char-count" id="countB">0 satır · 0 karakter</div>
     </div>
   </div>
@@ -1098,7 +1196,113 @@
   </div>
 </div>
 
+<!-- HISTORY SIDEBAR -->
+<div class="history-overlay" id="historyOverlay" onclick="toggleHistory()"></div>
+<div class="history-sidebar" id="historySidebar">
+  <div class="history-header">
+    <div class="history-title">🕒 <span data-i18n="historyTitle">İşlem Geçmişi</span></div>
+    <button class="btn-close-fs" style="padding:4px 8px; font-size:12px; border:none; background:none; color:var(--text3);" onclick="toggleHistory()">✕</button>
+  </div>
+  <div class="history-list" id="historyList"></div>
+  <div class="history-footer">
+    <button class="btn-export" style="width:100%; justify-content:center; border-color:var(--del); color:var(--del);" onclick="clearAllHistory()">
+      🗑️ <span data-i18n="historyClear">Tümünü Temizle</span>
+    </button>
+  </div>
+</div>
+
 <script>
+// ─── HISTORY LOGIC ───────────────────────────────────────────────────────────
+function toggleHistory() {
+  const sidebar = document.getElementById('historySidebar');
+  const overlay = document.getElementById('historyOverlay');
+  const isActive = sidebar.classList.toggle('active');
+  overlay.classList.toggle('active', isActive);
+  if (isActive) renderHistory();
+}
+
+function saveToHistory(textA, textB, type) {
+  const maxHistory = 20;
+  let history = JSON.parse(localStorage.getItem('diffHistory') || '[]');
+  
+  const entry = {
+    id: Date.now(),
+    date: new Date().toLocaleString(),
+    type: type, // 'text' or 'file'
+    nameA: type === 'file' ? (document.getElementById('fileNameA').textContent) : 'Text A',
+    nameB: type === 'file' ? (document.getElementById('fileNameB').textContent) : 'Text B',
+    contentA: textA,
+    contentB: textB,
+    stats: calcStats(lastDiffResult)
+  };
+
+  history.unshift(entry);
+  if (history.length > maxHistory) history.pop();
+  localStorage.setItem('diffHistory', JSON.stringify(history));
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  const history = JSON.parse(localStorage.getItem('diffHistory') || '[]');
+  const t = translations[currentLang];
+
+  if (history.length === 0) {
+    list.innerHTML = `<div class="history-empty">${t.historyEmpty}</div>`;
+    return;
+  }
+
+  list.innerHTML = history.map(item => `
+    <div class="history-item" onclick="loadHistory(${item.id})">
+      <div class="history-item-top">
+        <div class="history-item-name">${item.nameA} ↔ ${item.nameB}</div>
+        <button class="btn-delete-history" onclick="event.stopPropagation(); deleteHistory(${item.id})">✕</button>
+      </div>
+      <div class="history-item-date">${item.date}</div>
+      <div class="history-item-meta">
+        +${item.stats.added} -${item.stats.deleted} mod:${item.stats.modified}
+      </div>
+    </div>
+  `).join('');
+}
+
+function loadHistory(id) {
+  const history = JSON.parse(localStorage.getItem('diffHistory') || '[]');
+  const item = history.find(h => h.id === id);
+  if (!item) return;
+
+  if (item.type === 'text') {
+    switchTab('text');
+    document.getElementById('textA').value = item.contentA;
+    document.getElementById('textB').value = item.contentB;
+    updateCount('a');
+    updateCount('b');
+  } else {
+    switchTab('file');
+    fileContentA = item.contentA;
+    fileContentB = item.contentB;
+    showFileInfo('a', item.nameA, item.contentA.length);
+    showFileInfo('b', item.nameB, item.contentB.length);
+  }
+
+  toggleHistory();
+  runDiff();
+  showToast(translations[currentLang].historyLoaded, 'success');
+}
+
+function deleteHistory(id) {
+  let history = JSON.parse(localStorage.getItem('diffHistory') || '[]');
+  history = history.filter(h => h.id !== id);
+  localStorage.setItem('diffHistory', JSON.stringify(history));
+  renderHistory();
+  showToast(translations[currentLang].historyDeleted, 'success');
+}
+
+function clearAllHistory() {
+  localStorage.removeItem('diffHistory');
+  renderHistory();
+  showToast(translations[currentLang].historyAllCleared, 'success');
+}
+
 // ─── I18N ─────────────────────────────────────────────────────────────────────
 const translations = {
   tr: {
@@ -1169,6 +1373,13 @@ const translations = {
     fsClose: '✕ Kapat',
     optSyntax: 'Vurgulama:',
     optEnable: 'Açık',
+    btnHistory: 'Geçmiş',
+    historyTitle: 'İşlem Geçmişi',
+    historyEmpty: 'Henüz kayıtlı işlem yok.',
+    historyClear: 'Tümünü Temizle',
+    historyDeleted: 'Kayıt silindi',
+    historyAllCleared: 'Tüm geçmiş temizlendi',
+    historyLoaded: 'Kayıt yüklendi',
   },
   en: {
     headerMeta: 'v1.6 · Fully local · No data sent to server',
@@ -1238,6 +1449,13 @@ const translations = {
     fsClose: '✕ Close',
     optSyntax: 'Syntax:',
     optEnable: 'Enabled',
+    btnHistory: 'History',
+    historyTitle: 'Action History',
+    historyEmpty: 'No history yet.',
+    historyClear: 'Clear All',
+    historyDeleted: 'Entry deleted',
+    historyAllCleared: 'History cleared',
+    historyLoaded: 'Entry loaded',
   }
 };
 
@@ -1289,6 +1507,10 @@ function switchTab(tab) {
   document.querySelectorAll('.tab').forEach((el, i) => {
     el.classList.toggle('active', (i === 0 && tab === 'text') || (i === 1 && tab === 'file'));
   });
+  if (tab === 'text') {
+    updateLineNumbers('a');
+    updateLineNumbers('b');
+  }
 }
 
 function setView(v) {
@@ -1305,6 +1527,26 @@ function updateCount(side) {
   const lines = el.value === '' ? 0 : el.value.split('\n').length;
   const t = translations[currentLang];
   counter.textContent = t.lineCount(lines, el.value.length);
+  updateLineNumbers(side);
+}
+
+function updateLineNumbers(side) {
+  const textarea = document.getElementById('text' + side.toUpperCase());
+  const lineNumContainer = document.getElementById('lineNums' + side.toUpperCase());
+  const lines = textarea.value.split('\n');
+  const lineCount = Math.max(1, lines.length);
+  let lineNumbersHTML = '';
+  for (let i = 1; i <= lineCount; i++) {
+    lineNumbersHTML += i + '<br>';
+  }
+  lineNumContainer.innerHTML = lineNumbersHTML;
+  syncInputScroll(side);
+}
+
+function syncInputScroll(side) {
+  const textarea = document.getElementById('text' + side.toUpperCase());
+  const lineNumContainer = document.getElementById('lineNums' + side.toUpperCase());
+  lineNumContainer.scrollTop = textarea.scrollTop;
 }
 
 function copyText(side) {
@@ -1315,8 +1557,10 @@ function copyText(side) {
 }
 
 function clearText(side) {
-  document.getElementById('text' + side.toUpperCase()).value = '';
+  const textarea = document.getElementById('text' + side.toUpperCase());
+  textarea.value = '';
   updateCount(side);
+  updateLineNumbers(side);
 }
 
 // ─── FILE HANDLING ────────────────────────────────────────────────────────────
@@ -1623,6 +1867,7 @@ function runDiff() {
 
   renderDiff(diff);
   updateMinimap();
+  saveToHistory(textA, textB, currentTab);
   showToast(translations[currentLang].toastDone(stats.added + stats.deleted + stats.modified), 'success');
 }
 
