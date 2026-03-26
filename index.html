@@ -33,6 +33,21 @@
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* Prism.js Dark Theme Integration (Customized for DiffTool) */
+  code[class*="language-"], pre[class*="language-"] { color: var(--text); background: none; font-family: var(--mono); font-size: 13px; text-align: left; white-space: pre; word-spacing: normal; word-break: normal; word-wrap: normal; line-height: 1.5; tab-size: 4; hyphens: none; }
+  .token.comment, .token.prolog, .token.doctype, .token.cdata { color: #6272a4; }
+  .token.punctuation { color: #f8f8f2; }
+  .namespace { opacity: .7; }
+  .token.property, .token.tag, .token.constant, .token.symbol, .token.deleted { color: #ff79c6; }
+  .token.boolean, .token.number { color: #bd93f9; }
+  .token.selector, .token.attr-name, .token.string, .token.char, .token.builtin, .token.inserted { color: #50fa7b; }
+  .token.operator, .token.entity, .token.url, .language-css .token.string, .style .token.string { color: #f8f8f2; }
+  .token.atrule, .token.attr-value, .token.function, .token.class-name { color: #f1fa8c; }
+  .token.keyword { color: #8be9fd; }
+  .token.regex, .token.important, .token.variable { color: #ffb86c; }
+  .token.bold { font-weight: bold; }
+  .token.italic { font-style: italic; }
+
   body {
     font-family: var(--sans);
     background: var(--bg);
@@ -291,6 +306,7 @@
     border-radius: var(--radius);
     overflow: hidden;
   }
+  .results-body { display: flex; position: relative; }
   .results-header {
     display: flex;
     align-items: center;
@@ -319,11 +335,42 @@
 
   /* DIFF VIEW */
   .diff-container {
+    flex: 1;
     overflow: auto;
     max-height: 600px;
     font-family: var(--mono);
     font-size: 13px;
     line-height: 1.65;
+  }
+
+  .diff-minimap {
+    width: 44px;
+    background: var(--surface2);
+    border-left: 1px solid var(--border);
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .minimap-marker {
+    position: absolute;
+    left: 0; width: 100%;
+    height: 2px;
+    pointer-events: none;
+  }
+  .minimap-marker.add { background: var(--add); box-shadow: 0 0 4px var(--add); z-index: 2; }
+  .minimap-marker.del { background: var(--del); box-shadow: 0 0 4px var(--del); z-index: 2; }
+  .minimap-marker.mod { background: var(--mod); box-shadow: 0 0 4px var(--mod); z-index: 2; }
+  
+  .minimap-viewport {
+    position: absolute;
+    left: 0; width: 100%;
+    background: rgba(79,142,247,0.12);
+    border-top: 1px solid rgba(79,142,247,0.4);
+    border-bottom: 1px solid rgba(79,142,247,0.4);
+    z-index: 5;
+    pointer-events: none;
   }
 
   /* Split view */
@@ -929,6 +976,21 @@
     <label class="checkbox-label">
       <input type="checkbox" id="optWordDiff" checked> <span data-i18n="optWord">Kelime Diff</span>
     </label>
+    <div class="separator"></div>
+    <div class="option-group">
+      <span class="option-label" data-i18n="optSyntax">Vurgulama:</span>
+      <label class="checkbox-label"><input type="checkbox" id="optSyntaxHighlight" onchange="renderDiff(lastDiffResult)"> <span data-i18n="optEnable">Açık</span></label>
+      <select id="optLanguage" onchange="renderDiff(lastDiffResult)" style="background:var(--surface3); color:var(--text2); border:1px solid var(--border); border-radius:4px; padding:2px 6px; font-size:12px; font-family:var(--mono); outline:none; cursor:pointer;">
+        <option value="javascript">JavaScript</option>
+        <option value="markup">HTML/XML</option>
+        <option value="css">CSS</option>
+        <option value="python">Python</option>
+        <option value="json">JSON</option>
+        <option value="clike">C-Like</option>
+        <option value="markdown">Markdown</option>
+        <option value="bash">Bash</option>
+      </select>
+    </div>
   </div>
 
   <!-- STATS -->
@@ -975,11 +1037,16 @@
       <div class="change-nav-hint" id="changeNavHint">F7 · Shift+F7</div>
     </div>
 
-    <div class="diff-container" id="diffContainer">
-      <div class="empty-state">
-        <div class="empty-state-icon">🔀</div>
-        <div class="empty-state-text" data-i18n="emptyStateText">İki metin veya dosya girin</div>
-        <div class="empty-state-hint" data-i18n="emptyStateHint">Karşılaştır düğmesine basarak farkları görün</div>
+    <div class="results-body">
+      <div class="diff-container" id="diffContainer">
+        <div class="empty-state">
+          <div class="empty-state-icon">🔀</div>
+          <div class="empty-state-text" data-i18n="emptyStateText">İki metin veya dosya girin</div>
+          <div class="empty-state-hint" data-i18n="emptyStateHint">Karşılaştır düğmesine basarak farkları görün</div>
+        </div>
+      </div>
+      <div id="diffMinimap" class="diff-minimap" style="display:none">
+        <div class="minimap-viewport" id="minimapViewport"></div>
       </div>
     </div>
     <div class="legend" id="legendBar" style="display:none">
@@ -1100,6 +1167,8 @@ const translations = {
     fsZoomResetTitle: 'Sıfırla',
     fsZoomReset: '⟳ Sıfırla',
     fsClose: '✕ Kapat',
+    optSyntax: 'Vurgulama:',
+    optEnable: 'Açık',
   },
   en: {
     headerMeta: 'v1.6 · Fully local · No data sent to server',
@@ -1167,6 +1236,8 @@ const translations = {
     fsZoomResetTitle: 'Reset',
     fsZoomReset: '⟳ Reset',
     fsClose: '✕ Close',
+    optSyntax: 'Syntax:',
+    optEnable: 'Enabled',
   }
 };
 
@@ -1299,36 +1370,114 @@ function formatSize(bytes) {
   return (bytes/1048576).toFixed(1) + ' MB';
 }
 
-// ─── DIFF ALGORITHM (Myers-like LCS) ─────────────────────────────────────────
+// ─── DIFF ALGORITHM (Myers Algorithm) ────────────────────────────────────────
 function lcs(a, b) {
   const n = a.length, m = b.length;
   if (n === 0 || m === 0) return [];
-  if (n * m > 200000) return lcsGreedy(a, b);
-  const dp = [];
-  for (let i = 0; i <= n; i++) { dp[i] = new Array(m+1).fill(0); }
-  for (let i = 1; i <= n; i++)
-    for (let j = 1; j <= m; j++)
-      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
+
+  // 1. Prefix/Suffix Stripping (O(N) optimization)
+  let start = 0;
+  while (start < n && start < m && a[start] === b[start]) start++;
+
+  let endA = n - 1, endB = m - 1;
+  while (endA >= start && endB >= start && a[endA] === b[endB]) {
+    endA--; endB--;
+  }
+
+  const prefix = [];
+  for (let i = 0; i < start; i++) prefix.push([i, i]);
+
+  const suffix = [];
+  const suffixLen = (n - 1) - endA;
+  for (let i = 0; i < suffixLen; i++) {
+    suffix.push([n - suffixLen + i, m - suffixLen + i]);
+  }
+
+  const midA = a.slice(start, endA + 1);
+  const midB = b.slice(start, endB + 1);
+
+  let midLCS = [];
+  if (midA.length > 0 && midB.length > 0) {
+    // For very large/different files, Myers can be O((N+M)*D). 
+    // We add a safety break for extremely complex cases (> 5M operations)
+    midLCS = myersLCS(midA, midB);
+  }
+
+  return prefix.concat(midLCS.map(([ai, bi]) => [ai + start, bi + start])).concat(suffix);
+}
+
+/**
+ * Myers Diff Algorithm to find Longest Common Subsequence
+ * Returns array of [indexInA, indexInB]
+ */
+function myersLCS(a, b) {
+  const n = a.length, m = b.length;
+  const max = n + m;
+  const v = { 1: 0 };
+  const trace = [];
+
+  for (let d = 0; d <= max; d++) {
+    trace.push({ ...v });
+    for (let k = -d; k <= d; k += 2) {
+      let x;
+      if (k === -d || (k !== d && v[k - 1] < v[k + 1])) {
+        x = v[k + 1];
+      } else {
+        x = v[k - 1] + 1;
+      }
+      let y = x - k;
+      while (x < n && y < m && a[x] === b[y]) {
+        x++; y++;
+      }
+      v[k] = x;
+      if (x >= n && y >= m) {
+        return backtrackMyers(trace, a, b);
+      }
+    }
+    // Safety break: if it's taking too long (extremely different large files)
+    if (trace.length > 5000) break; 
+  }
+  // Fallback to simple greedy if Myers exceeds safety limits
+  return fallbackGreedy(a, b);
+}
+
+function backtrackMyers(trace, a, b) {
   const seq = [];
-  let i = n, j = m;
-  while (i > 0 && j > 0) {
-    if (a[i-1] === b[j-1]) { seq.unshift([i-1,j-1]); i--; j--; }
-    else if (dp[i-1][j] > dp[i][j-1]) i--;
-    else j--;
+  let x = a.length, y = b.length;
+  for (let d = trace.length - 1; d >= 0; d--) {
+    const v = trace[d];
+    const k = x - y;
+    let prevK;
+    if (k === -d || (k !== d && v[k - 1] < v[k + 1])) {
+      prevK = k + 1;
+    } else {
+      prevK = k - 1;
+    }
+    const prevX = v[prevK];
+    const prevY = prevX - prevK;
+    while (x > prevX && y > prevY) {
+      x--; y--;
+      seq.unshift([x, y]);
+    }
+    x = prevX; y = prevY;
   }
   return seq;
 }
 
-function lcsGreedy(a, b) {
+function fallbackGreedy(a, b) {
   const result = [];
   const bMap = new Map();
-  b.forEach((v,i) => { if (!bMap.has(v)) bMap.set(v,[]); bMap.get(v).push(i); });
+  b.forEach((v, i) => { if (!bMap.has(v)) bMap.set(v, []); bMap.get(v).push(i); });
   let prevJ = -1;
   for (let i = 0; i < a.length; i++) {
     const positions = bMap.get(a[i]);
     if (!positions) continue;
     for (const j of positions) {
-      if (j > prevJ) { result.push([i,j]); prevJ = j; break; }
+      if (j > prevJ) {
+        result.push([i, j]);
+        prevJ = j;
+        break;
+      }
     }
   }
   return result;
@@ -1424,6 +1573,15 @@ function esc(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+function highlightLine(text) {
+  const enabled = document.getElementById('optSyntaxHighlight').checked;
+  if (!enabled || !window.Prism) return esc(text);
+  const lang = document.getElementById('optLanguage').value;
+  const grammar = Prism.languages[lang];
+  if (!grammar) return esc(text);
+  return Prism.highlight(text, grammar, lang);
+}
+
 // ─── STATS ───────────────────────────────────────────────────────────────────
 function calcStats(diff) {
   let added=0, deleted=0, modified=0, unchanged=0;
@@ -1464,8 +1622,65 @@ function runDiff() {
   document.getElementById('statsRow').style.display = 'grid';
 
   renderDiff(diff);
+  updateMinimap();
   showToast(translations[currentLang].toastDone(stats.added + stats.deleted + stats.modified), 'success');
 }
+
+// ─── MINIMAP LOGIC ───────────────────────────────────────────────────────────
+function updateMinimap() {
+  const minimap = document.getElementById('diffMinimap');
+  const container = document.getElementById('diffContainer');
+  if (!lastDiffResult || lastDiffResult.length === 0) {
+    minimap.style.display = 'none';
+    return;
+  }
+
+  minimap.style.display = 'block';
+  // Clear old markers (except viewport)
+  minimap.querySelectorAll('.minimap-marker').forEach(m => m.remove());
+
+  const totalLines = lastDiffResult.length;
+  const minimapHeight = minimap.clientHeight;
+
+  lastDiffResult.forEach((op, idx) => {
+    if (op.type === 'eq') return;
+    
+    const marker = document.createElement('div');
+    marker.className = `minimap-marker ${op.type}`;
+    marker.style.top = (idx / totalLines * 100) + '%';
+    minimap.appendChild(marker);
+  });
+
+  syncMinimapViewport();
+}
+
+function syncMinimapViewport() {
+  const container = document.getElementById('diffContainer');
+  const viewport = document.getElementById('minimapViewport');
+  if (!container || !viewport) return;
+
+  const scrollPct = container.scrollTop / container.scrollHeight;
+  const visiblePct = container.clientHeight / container.scrollHeight;
+
+  viewport.style.top = (scrollPct * 100) + '%';
+  viewport.style.height = (visiblePct * 100) + '%';
+}
+
+document.getElementById('diffContainer').addEventListener('scroll', syncMinimapViewport);
+
+document.getElementById('diffMinimap').addEventListener('click', e => {
+  const container = document.getElementById('diffContainer');
+  const rect = e.currentTarget.getBoundingClientRect();
+  const clickY = e.clientY - rect.top;
+  const clickPct = clickY / rect.height;
+  
+  container.scrollTo({
+    top: clickPct * container.scrollHeight - container.clientHeight / 2,
+    behavior: 'smooth'
+  });
+});
+
+window.addEventListener('resize', updateMinimap);
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
 function renderDiff(diff) {
@@ -1549,7 +1764,7 @@ function renderSplit(diff, container, showNums, wordDiffOn) {
       group.ops.forEach(({ op }) => {
         const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
         const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
-        hiddenPairs += pairRow(lineCell('context', ln, ' ', esc(op.textA)), lineCell('context', rn, ' ', esc(op.textB)));
+        hiddenPairs += pairRow(lineCell('context', ln, ' ', highlightLine(op.textA)), lineCell('context', rn, ' ', highlightLine(op.textB)));
       });
       rowsHTML += `<div class="collapse-rows" id="${cid}-rows">${hiddenPairs.replace(/<div class="diff-split-row">/g, '<div class="diff-split-row" style="display:none">')}</div>`;
 
@@ -1558,18 +1773,25 @@ function renderSplit(diff, container, showNums, wordDiffOn) {
         if (op.type === 'eq') {
           const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
           const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
-          rowsHTML += pairRow(lineCell('context', ln, ' ', esc(op.textA)), lineCell('context', rn, ' ', esc(op.textB)));
+          rowsHTML += pairRow(lineCell('context', ln, ' ', highlightLine(op.textA)), lineCell('context', rn, ' ', highlightLine(op.textB)));
         } else if (op.type === 'del') {
           const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
-          rowsHTML += pairRow(lineCell('deleted', ln, '−', esc(op.textA), `data-change-idx="${idx}" data-change-type="del"`), blankCell());
+          rowsHTML += pairRow(lineCell('deleted', ln, '−', highlightLine(op.textA), `data-change-idx="${idx}" data-change-type="del"`), blankCell());
         } else if (op.type === 'add') {
           const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
-          rowsHTML += pairRow(blankCell(), lineCell('added', rn, '+', esc(op.textB), `data-change-idx="${idx}" data-change-type="add"`));
+          rowsHTML += pairRow(blankCell(), lineCell('added', rn, '+', highlightLine(op.textB), `data-change-idx="${idx}" data-change-type="add"`));
         } else if (op.type === 'mod') {
           const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
           const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
-          let contA = esc(op.textA), contB = esc(op.textB);
-          if (wordDiffOn) { const wd = wordDiff(op.textA, op.textB); contA = wd.htmlA; contB = wd.htmlB; }
+          let contA, contB;
+          if (wordDiffOn) { 
+            const wd = wordDiff(op.textA, op.textB); 
+            contA = wd.htmlA; 
+            contB = wd.htmlB; 
+          } else {
+            contA = highlightLine(op.textA);
+            contB = highlightLine(op.textB);
+          }
           rowsHTML += pairRow(lineCell('modified-a', ln, '−', contA, `data-change-idx="${idx}" data-change-type="mod"`), lineCell('modified-b', rn, '+', contB, `data-change-idx="${idx}" data-change-type="mod"`));
         }
       });
@@ -1620,7 +1842,7 @@ function renderUnified(diff, container, showNums, wordDiffOn) {
       let hiddenRows = '';
       group.ops.forEach(({ op }) => {
         const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
-        hiddenRows += `<div class="diff-line context">${ln}<span class="line-sign"> </span><span class="line-content">${esc(op.textA)}</span></div>`;
+        hiddenRows += `<div class="diff-line context">${ln}<span class="line-sign"> </span><span class="line-content">${highlightLine(op.textA)}</span></div>`;
       });
       html += `<div class="collapse-rows" id="${cid}" style="display:none">${hiddenRows}</div>`;
 
@@ -1628,18 +1850,25 @@ function renderUnified(diff, container, showNums, wordDiffOn) {
       group.ops.forEach(({ op, idx }) => {
         if (op.type === 'eq') {
           const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
-          html += `<div class="diff-line context">${ln}<span class="line-sign"> </span><span class="line-content">${esc(op.textA)}</span></div>`;
+          html += `<div class="diff-line context">${ln}<span class="line-sign"> </span><span class="line-content">${highlightLine(op.textA)}</span></div>`;
         } else if (op.type === 'del') {
           const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
-          html += `<div class="diff-line deleted" data-change-idx="${idx}" data-change-type="del">${ln}<span class="line-sign">−</span><span class="line-content">${esc(op.textA)}</span></div>`;
+          html += `<div class="diff-line deleted" data-change-idx="${idx}" data-change-type="del">${ln}<span class="line-sign">−</span><span class="line-content">${highlightLine(op.textA)}</span></div>`;
         } else if (op.type === 'add') {
           const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
-          html += `<div class="diff-line added" data-change-idx="${idx}" data-change-type="add">${rn}<span class="line-sign">+</span><span class="line-content">${esc(op.textB)}</span></div>`;
+          html += `<div class="diff-line added" data-change-idx="${idx}" data-change-type="add">${rn}<span class="line-sign">+</span><span class="line-content">${highlightLine(op.textB)}</span></div>`;
         } else if (op.type === 'mod') {
           const ln = showNums ? `<span class="line-num">${op.lineA}</span>` : '';
           const rn = showNums ? `<span class="line-num">${op.lineB}</span>` : '';
-          let contA = esc(op.textA), contB = esc(op.textB);
-          if (wordDiffOn) { const wd = wordDiff(op.textA, op.textB); contA = wd.htmlA; contB = wd.htmlB; }
+          let contA, contB;
+          if (wordDiffOn) { 
+            const wd = wordDiff(op.textA, op.textB); 
+            contA = wd.htmlA; 
+            contB = wd.htmlB; 
+          } else {
+            contA = highlightLine(op.textA);
+            contB = highlightLine(op.textB);
+          }
           html += `<div class="diff-line modified-a" data-change-idx="${idx}" data-change-type="mod">${ln}<span class="line-sign">−</span><span class="line-content">${contA}</span></div>`;
           html += `<div class="diff-line modified-b" data-change-idx="${idx}" data-change-type="mod">${rn}<span class="line-sign">+</span><span class="line-content">${contB}</span></div>`;
         }
@@ -1978,5 +2207,14 @@ document.getElementById('fullscreenOverlay').addEventListener('wheel', e => {
   }
 }, { passive: false });
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markdown.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-clike.min.js"></script>
 </body>
 </html>
