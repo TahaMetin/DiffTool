@@ -17,13 +17,17 @@ DiffTool was built with one goal: **give you a professional-grade diff experienc
 ## ✨ Features
 
 - **Text & File modes** — paste text directly or drag & drop any file (TXT, JS, PY, HTML, JSON, XML, CSV, MD, and more)
-- **LCS-based diff engine** — accurate line-by-line comparison using the Longest Common Subsequence algorithm
+- **Advanced Diff Engine** — high-performance comparison using the **Myers Diff Algorithm** with prefix/suffix stripping optimizations
+- **Syntax Highlighting** — professional code highlighting for JavaScript, Python, HTML, CSS, C-like, and more (via Prism.js)
+- **Interactive Minimap** — high-level overview of changes with draggable viewport for quick navigation
+- **Action History** — locally stored history of your previous comparisons to quickly jump back to work
 - **Word-level diff** — highlights exactly which words changed within a modified line
 - **Side-by-side & Unified views** — switch between layouts depending on your preference
+- **Fullscreen Mode** — distraction-free comparison with zoom controls and synchronized navigation
+- **Bilingual Support** — fully localized UI in both **Turkish** and **English**
 - **Statistics** — added, deleted, modified, and unchanged line counts at a glance
 - **Export** — download results as HTML or plain text, or copy to clipboard
-- **Options** — ignore case, ignore whitespace, toggle line numbers
-- **Keyboard shortcut** — `Ctrl+Enter` to compare instantly
+- **Keyboard shortcuts** — `F7/Shift+F7` for navigation, `Ctrl+Enter` to compare instantly
 
 ---
 
@@ -39,12 +43,14 @@ That's it. The file is fully self-contained — one HTML file with all CSS and J
 
 ---
 
-## 🔒 Privacy
+## 🔒 Privacy & Security
 
-- All processing happens **locally in your browser**
-- **Nothing is sent to any server**
-- No cookies, no analytics, no tracking
-- Works completely **offline** after the page loads (fonts may require an internet connection on first load)
+- **Local Processing** — All diffing and rendering happen **locally in your browser**.
+- **Zero Data Leakage** — Nothing is ever sent to a server.
+- **Action History** — Stored exclusively in your browser's `localStorage`. You can clear it at any time.
+- **Security First** — Inputs are rigorously escaped to prevent XSS (Cross-Site Scripting) attacks.
+- **Zero Tracking Cookies** — No analytics, no tracking, no third-party scripts.
+- **Offline Ready** — Works completely offline after the initial load.
 
 ---
 

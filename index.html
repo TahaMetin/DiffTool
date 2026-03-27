@@ -1534,7 +1534,13 @@ function setView(v) {
   currentView = v;
   document.getElementById('toggle-split').classList.toggle('active', v === 'split');
   document.getElementById('toggle-unified').classList.toggle('active', v === 'unified');
-  if (lastDiffResult) renderDiff(lastDiffResult);
+  if (lastDiffResult) {
+    renderDiff(lastDiffResult);
+    updateMinimap(false);
+    if (document.getElementById('fullscreenOverlay').classList.contains('active')) {
+      updateMinimap(true);
+    }
+  }
 }
 
 // ─── CHAR COUNT ────────────────────────────────────────────────────────────────
@@ -1744,15 +1750,15 @@ function fallbackGreedy(a, b) {
   return result;
 }
 
-function computeDiff(textA, textB) {
+function computeDiff(textA, textB, options = {}) {
   let linesA = textA.split('\n');
   let linesB = textB.split('\n');
   if (linesA[linesA.length-1] === '' && linesB[linesB.length-1] === '') {
     linesA.pop(); linesB.pop();
   }
 
-  const ignCase = document.getElementById('optIgnoreCase').checked;
-  const ignWS   = document.getElementById('optIgnoreWhitespace').checked;
+  const ignCase = options.ignoreCase ?? false;
+  const ignWS   = options.ignoreWhitespace ?? false;
 
   const normalize = (s) => {
     let r = s;
@@ -1872,7 +1878,12 @@ function runDiff() {
 
   if (!textA && !textB) return showToast(translations[currentLang].toastNoText, 'error');
 
-  const diff = computeDiff(textA, textB);
+  const options = {
+    ignoreCase: document.getElementById('optIgnoreCase').checked,
+    ignoreWhitespace: document.getElementById('optIgnoreWhitespace').checked
+  };
+
+  const diff = computeDiff(textA, textB, options);
   lastDiffResult = diff;
 
   const stats = calcStats(diff);
